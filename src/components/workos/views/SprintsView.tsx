@@ -103,7 +103,7 @@ export function SprintsView() {
           {active.length === 0 ? (
             <EmptyState Icon={Flame} title="No hay sprint activo" description="Crea o promueve un sprint en planning para empezar." action={() => setTab("planning")} actionLabel="Ir a planning" />
           ) : active.map(s => (
-            <ActiveSprintPanel key={s.id} sprint={s} onComplete={() => completeSprint(s)} onEdit={() => setSprintDlg({ open: true, id: s.id })} onAddTask={() => setTaskDlg({ open: true, id: null, sprintId: s.id })} onMoveTask={moveTaskToSprint} dragId={dragId} setDragId={setDragId} />
+            <ActiveSprintPanel key={s.id} sprint={s} onComplete={() => completeSprint(s)} onEdit={() => setSprintDlg({ open: true, id: s.id })} onAddTask={() => setTaskDlg({ open: true, id: null, sprintId: s.id })} onMoveTask={moveTaskToSprint} dragId={dragId} setDragId={setDragId} onOpenTask={(id: string) => setDetailTaskId(id)} />
           ))}
         </div>
       )}
@@ -253,7 +253,7 @@ function useSprintMetrics(sprint: Sprint) {
   return { tasks, totalPts, donePts, inProgress, blocked, risk, done, totalDays, elapsed, remaining, completion, burndown };
 }
 
-function ActiveSprintPanel({ sprint, onComplete, onEdit, onAddTask, onMoveTask, dragId, setDragId }: any) {
+function ActiveSprintPanel({ sprint, onComplete, onEdit, onAddTask, onMoveTask, dragId, setDragId, onOpenTask }: any) {
   const { state, dispatch } = useWorkOS();
   const m = useSprintMetrics(sprint);
   const memberLoad = useMemo(() => {
@@ -369,7 +369,7 @@ function ActiveSprintPanel({ sprint, onComplete, onEdit, onAddTask, onMoveTask, 
                 className="rounded-lg border bg-card/60 p-2 min-h-[120px]">
                 <div className="flex items-center justify-between mb-2 px-1"><StatusBadge status={st} /><span className="text-[10px] tabular-nums text-muted-foreground">{items.length}</span></div>
                 <div className="space-y-1.5">
-                  {items.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} />)}
+                  {items.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} onClick={() => onOpenTask?.(t.id)} />)}
                 </div>
               </div>
             );
@@ -380,7 +380,7 @@ function ActiveSprintPanel({ sprint, onComplete, onEdit, onAddTask, onMoveTask, 
   );
 }
 
-function PlanningSprintPanel({ sprint, backlog, onStart, onEdit, onDelete, onAddTask, onMoveTask, dragId, setDragId, isOpen, onToggle }: any) {
+function PlanningSprintPanel({ sprint, backlog, onStart, onEdit, onDelete, onAddTask, onMoveTask, dragId, setDragId, isOpen, onToggle, onOpenTask }: any) {
   const m = useSprintMetrics(sprint);
   const overCapacity = m.totalPts > sprint.capacityPoints;
   return (
@@ -415,7 +415,7 @@ function PlanningSprintPanel({ sprint, backlog, onStart, onEdit, onDelete, onAdd
             </div>
             {m.tasks.length === 0 ? <div className="py-8 text-center text-xs text-muted-foreground italic">Arrastra tareas del backlog aquí →</div> :
               <div className="space-y-1.5 max-h-80 overflow-auto scrollbar-thin">
-                {m.tasks.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} onRemove={() => onMoveTask(t.id, null)} showRemove />)}
+                {m.tasks.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} onRemove={() => onMoveTask(t.id, null)} showRemove onClick={() => onOpenTask?.(t.id)} />)}
               </div>}
           </div>
           <div className="rounded-lg border bg-card p-3">
@@ -424,7 +424,7 @@ function PlanningSprintPanel({ sprint, backlog, onStart, onEdit, onDelete, onAdd
             </div>
             {backlog.length === 0 ? <div className="py-8 text-center text-xs text-muted-foreground italic">Backlog vacío 🎉</div> :
               <div className="space-y-1.5 max-h-80 overflow-auto scrollbar-thin">
-                {backlog.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} onAdd={() => onMoveTask(t.id, sprint.id)} showAdd />)}
+                {backlog.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} onAdd={() => onMoveTask(t.id, sprint.id)} showAdd onClick={() => onOpenTask?.(t.id)} />)}
               </div>}
           </div>
         </div>
@@ -433,7 +433,7 @@ function PlanningSprintPanel({ sprint, backlog, onStart, onEdit, onDelete, onAdd
   );
 }
 
-function BacklogPanel({ backlog, onAddTask, onMove, onEdit, dragId, setDragId }: any) {
+function BacklogPanel({ backlog, onAddTask, onMove, onEdit, onOpenTask, dragId, setDragId }: any) {
   const { state } = useWorkOS();
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [prioFilter, setPrioFilter] = useState<string>("all");
@@ -476,7 +476,7 @@ function BacklogPanel({ backlog, onAddTask, onMove, onEdit, dragId, setDragId }:
                 <PriorityBadge priority={t.priority} />
                 {area && <AreaPill name={area.name} color={area.color} />}
                 <div className="flex-1 min-w-0">
-                  <button onClick={() => onEdit(t.id)} className="font-medium text-sm text-foreground hover:text-primary text-left truncate block w-full">{t.title}</button>
+                  <button onClick={() => onOpenTask ? onOpenTask(t.id) : onEdit(t.id)} className="font-medium text-sm text-foreground hover:text-primary text-left truncate block w-full">{t.title}</button>
                   {t.description && <div className="text-xs text-muted-foreground truncate">{t.description}</div>}
                 </div>
                 <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold tabular-nums">{t.storyPoints} pts</span>
