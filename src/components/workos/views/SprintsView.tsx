@@ -536,12 +536,12 @@ function Stat({ label, value, sub, tone, progress }: { label: string; value: any
   );
 }
 
-function SprintTaskCard({ task, onDragStart, onRemove, onAdd, showRemove, showAdd }: { task: Task; onDragStart: () => void; onRemove?: () => void; onAdd?: () => void; showRemove?: boolean; showAdd?: boolean }) {
+function SprintTaskCard({ task, onDragStart, onRemove, onAdd, showRemove, showAdd, onClick }: { task: Task; onDragStart: () => void; onRemove?: () => void; onAdd?: () => void; showRemove?: boolean; showAdd?: boolean; onClick?: () => void }) {
   const { state } = useWorkOS();
   const area = state.areas.find(a => a.id === task.areaId);
   const members = task.assigneeIds.map(id => state.members.find(m => m.id === id)).filter(Boolean) as any[];
   return (
-    <div draggable onDragStart={onDragStart} className="group rounded-md border bg-card p-2 shadow-xs hover:shadow-soft cursor-grab active:cursor-grabbing transition">
+    <div draggable onDragStart={onDragStart} onClick={onClick} className="group rounded-md border bg-card p-2 shadow-xs hover:shadow-soft hover:border-primary/40 cursor-pointer transition">
       <div className="flex items-center gap-2">
         <span className="rounded bg-muted text-foreground px-1.5 py-0.5 text-[10px] font-bold tabular-nums">{task.storyPoints}</span>
         <span className="text-xs font-medium flex-1 truncate">{task.title}</span>
@@ -551,8 +551,8 @@ function SprintTaskCard({ task, onDragStart, onRemove, onAdd, showRemove, showAd
         {area && <AreaPill name={area.name} color={area.color} className="text-[10px]" />}
         <div className="flex items-center gap-1.5">
           {members.length > 0 && <AvatarStack size="xs" members={members.map(m => ({ initials: m.initials, color: m.color, name: m.name }))} max={3} />}
-          {showRemove && <button onClick={onRemove} className="rounded p-0.5 hover:bg-destructive/10 text-destructive opacity-0 group-hover:opacity-100" title="Mover a backlog"><ArrowDown className="h-3 w-3" /></button>}
-          {showAdd && <button onClick={onAdd} className="rounded p-0.5 hover:bg-primary/10 text-primary opacity-0 group-hover:opacity-100" title="Añadir al sprint"><ArrowRight className="h-3 w-3" /></button>}
+          {showRemove && <button onClick={(e) => { e.stopPropagation(); onRemove?.(); }} className="rounded p-0.5 hover:bg-destructive/10 text-destructive opacity-0 group-hover:opacity-100" title="Mover a backlog"><ArrowDown className="h-3 w-3" /></button>}
+          {showAdd && <button onClick={(e) => { e.stopPropagation(); onAdd?.(); }} className="rounded p-0.5 hover:bg-primary/10 text-primary opacity-0 group-hover:opacity-100" title="Añadir al sprint"><ArrowRight className="h-3 w-3" /></button>}
         </div>
       </div>
       {task.progress > 0 && <ProgressBar value={task.progress} className="mt-1.5" />}
