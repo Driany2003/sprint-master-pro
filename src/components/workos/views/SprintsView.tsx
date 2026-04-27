@@ -12,6 +12,8 @@ import { Activity, AlertOctagon, ArrowDown, ArrowRight, CalendarRange, CheckCirc
 import { SprintDialog } from "./SprintDialog";
 import { TaskDialog } from "../TaskDialog";
 import { toast } from "sonner";
+import { ConfirmDialog } from "../ConfirmDialog";
+import { TaskDetailDialog } from "../TaskDetailDialog";
 
 export function SprintsView() {
   const { state, dispatch } = useWorkOS();
@@ -20,6 +22,9 @@ export function SprintsView() {
   const [tab, setTab] = useState<"active" | "planning" | "backlog" | "completed">("active");
   const [openSprint, setOpenSprint] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [confirmSprintId, setConfirmSprintId] = useState<string | null>(null);
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [confirmTaskId, setConfirmTaskId] = useState<string | null>(null);
 
   const sprints = state.sprints;
   const active = sprints.filter(s => s.status === "activo");
@@ -110,10 +115,11 @@ export function SprintsView() {
           ) : planning.map(s => (
             <PlanningSprintPanel key={s.id} sprint={s} backlog={backlog}
               onStart={() => startSprint(s)} onEdit={() => setSprintDlg({ open: true, id: s.id })}
-              onDelete={() => { dispatch({ type: "DELETE_SPRINT", payload: { id: s.id } }); toast.success("Sprint eliminado"); }}
+              onDelete={() => setConfirmSprintId(s.id)}
               onAddTask={() => setTaskDlg({ open: true, id: null, sprintId: s.id })}
               onMoveTask={moveTaskToSprint} dragId={dragId} setDragId={setDragId}
               isOpen={openSprint === s.id} onToggle={() => setOpenSprint(openSprint === s.id ? null : s.id)}
+              onOpenTask={(id: string) => setDetailTaskId(id)}
             />
           ))}
         </div>
@@ -125,6 +131,7 @@ export function SprintsView() {
           onAddTask={() => setTaskDlg({ open: true, id: null, sprintId: null })}
           onMove={moveTaskToSprint}
           onEdit={(id) => setTaskDlg({ open: true, id, sprintId: null })}
+          onOpenTask={(id: string) => setDetailTaskId(id)}
           dragId={dragId} setDragId={setDragId}
         />
       )}
@@ -160,6 +167,28 @@ export function SprintsView() {
 
       <SprintDialog open={sprintDlg.open} onOpenChange={(o) => setSprintDlg(s => ({ ...s, open: o }))} sprintId={sprintDlg.id} />
       <TaskDialog open={taskDlg.open} onOpenChange={(o) => setTaskDlg(s => ({ ...s, open: o }))} taskId={taskDlg.id} defaultSprintId={taskDlg.sprintId} />
+      <ConfirmDialog
+        open={!!confirmSprintId}
+        onOpenChange={(o) => !o && setConfirmSprintId(null)}
+        title="Eliminar sprint"
+        description="Las tareas del sprint volverán al backlog. Esta acción no se puede deshacer."
+        confirmLabel="Eliminar sprint"
+        onConfirm={() => { if (confirmSprintId) { dispatch({ type: "DELETE_SPRINT", payload: { id: confirmSprintId } }); toast.success("Sprint eliminado"); } setConfirmSprintId(null); }}
+      />
+      <TaskDetailDialog
+        open={!!detailTaskId}
+        onOpenChange={(o) => !o && setDetailTaskId(null)}
+        taskId={detailTaskId}
+        onEdit={(id) => { setDetailTaskId(null); setTaskDlg({ open: true, id, sprintId: null }); }}
+        onDelete={(id) => { setDetailTaskId(null); setConfirmTaskId(id); }}
+      />
+      <ConfirmDialog
+        open={!!confirmTaskId}
+        onOpenChange={(o) => !o && setConfirmTaskId(null)}
+        title="Eliminar tarea"
+        confirmLabel="Eliminar"
+        onConfirm={() => { if (confirmTaskId) { dispatch({ type: "DELETE_TASK", payload: { id: confirmTaskId } }); toast.success("Tarea eliminada"); } setConfirmTaskId(null); }}
+      />
     </div>
   );
 }
