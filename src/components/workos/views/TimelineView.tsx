@@ -10,6 +10,8 @@ import { Activity, AlertOctagon, CheckCircle2, ChevronLeft, ChevronRight, Pencil
 import { useWorkOS as _ } from "@/store/workos-store";
 import type { Task, TaskPriority } from "@/lib/types";
 import { Bell } from "lucide-react";
+import { ConfirmDialog } from "../ConfirmDialog";
+import { toast } from "sonner";
 
 const PRIO_COLOR: Record<TaskPriority, string> = {
   urgente: "hsl(var(--prio-urgent))",
@@ -177,6 +179,17 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
           </aside>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Eliminar tarea"
+        description="La tarea se eliminará del timeline y de su sprint."
+        confirmLabel="Eliminar"
+        onConfirm={() => {
+          if (selected) { dispatch({ type: "DELETE_TASK", payload: { id: selected.id } }); toast.success("Tarea eliminada"); setSelectedId(null); }
+          setConfirmDelete(false);
+        }}
+      />
     </div>
   );
 }
