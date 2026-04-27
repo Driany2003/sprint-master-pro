@@ -12,6 +12,8 @@ import { Activity, AlertOctagon, ArrowDown, ArrowRight, CalendarRange, CheckCirc
 import { SprintDialog } from "./SprintDialog";
 import { TaskDialog } from "../TaskDialog";
 import { toast } from "sonner";
+import { ConfirmDialog } from "../ConfirmDialog";
+import { TaskDetailDialog } from "../TaskDetailDialog";
 
 export function SprintsView() {
   const { state, dispatch } = useWorkOS();
@@ -20,6 +22,9 @@ export function SprintsView() {
   const [tab, setTab] = useState<"active" | "planning" | "backlog" | "completed">("active");
   const [openSprint, setOpenSprint] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [confirmSprintId, setConfirmSprintId] = useState<string | null>(null);
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [confirmTaskId, setConfirmTaskId] = useState<string | null>(null);
 
   const sprints = state.sprints;
   const active = sprints.filter(s => s.status === "activo");
@@ -98,7 +103,7 @@ export function SprintsView() {
           {active.length === 0 ? (
             <EmptyState Icon={Flame} title="No hay sprint activo" description="Crea o promueve un sprint en planning para empezar." action={() => setTab("planning")} actionLabel="Ir a planning" />
           ) : active.map(s => (
-            <ActiveSprintPanel key={s.id} sprint={s} onComplete={() => completeSprint(s)} onEdit={() => setSprintDlg({ open: true, id: s.id })} onAddTask={() => setTaskDlg({ open: true, id: null, sprintId: s.id })} onMoveTask={moveTaskToSprint} dragId={dragId} setDragId={setDragId} />
+            <ActiveSprintPanel key={s.id} sprint={s} onComplete={() => completeSprint(s)} onEdit={() => setSprintDlg({ open: true, id: s.id })} onAddTask={() => setTaskDlg({ open: true, id: null, sprintId: s.id })} onMoveTask={moveTaskToSprint} dragId={dragId} setDragId={setDragId} onOpenTask={(id: string) => setDetailTaskId(id)} />
           ))}
         </div>
       )}
@@ -110,10 +115,11 @@ export function SprintsView() {
           ) : planning.map(s => (
             <PlanningSprintPanel key={s.id} sprint={s} backlog={backlog}
               onStart={() => startSprint(s)} onEdit={() => setSprintDlg({ open: true, id: s.id })}
-              onDelete={() => { dispatch({ type: "DELETE_SPRINT", payload: { id: s.id } }); toast.success("Sprint eliminado"); }}
+              onDelete={() => setConfirmSprintId(s.id)}
               onAddTask={() => setTaskDlg({ open: true, id: null, sprintId: s.id })}
               onMoveTask={moveTaskToSprint} dragId={dragId} setDragId={setDragId}
               isOpen={openSprint === s.id} onToggle={() => setOpenSprint(openSprint === s.id ? null : s.id)}
+              onOpenTask={(id: string) => setDetailTaskId(id)}
             />
           ))}
         </div>
@@ -125,6 +131,7 @@ export function SprintsView() {
           onAddTask={() => setTaskDlg({ open: true, id: null, sprintId: null })}
           onMove={moveTaskToSprint}
           onEdit={(id) => setTaskDlg({ open: true, id, sprintId: null })}
+          onOpenTask={(id: string) => setDetailTaskId(id)}
           dragId={dragId} setDragId={setDragId}
         />
       )}
@@ -160,6 +167,28 @@ export function SprintsView() {
 
       <SprintDialog open={sprintDlg.open} onOpenChange={(o) => setSprintDlg(s => ({ ...s, open: o }))} sprintId={sprintDlg.id} />
       <TaskDialog open={taskDlg.open} onOpenChange={(o) => setTaskDlg(s => ({ ...s, open: o }))} taskId={taskDlg.id} defaultSprintId={taskDlg.sprintId} />
+      <ConfirmDialog
+        open={!!confirmSprintId}
+        onOpenChange={(o) => !o && setConfirmSprintId(null)}
+        title="Eliminar sprint"
+        description="Las tareas del sprint volverán al backlog. Esta acción no se puede deshacer."
+        confirmLabel="Eliminar sprint"
+        onConfirm={() => { if (confirmSprintId) { dispatch({ type: "DELETE_SPRINT", payload: { id: confirmSprintId } }); toast.success("Sprint eliminado"); } setConfirmSprintId(null); }}
+      />
+      <TaskDetailDialog
+        open={!!detailTaskId}
+        onOpenChange={(o) => !o && setDetailTaskId(null)}
+        taskId={detailTaskId}
+        onEdit={(id) => { setDetailTaskId(null); setTaskDlg({ open: true, id, sprintId: null }); }}
+        onDelete={(id) => { setDetailTaskId(null); setConfirmTaskId(id); }}
+      />
+      <ConfirmDialog
+        open={!!confirmTaskId}
+        onOpenChange={(o) => !o && setConfirmTaskId(null)}
+        title="Eliminar tarea"
+        confirmLabel="Eliminar"
+        onConfirm={() => { if (confirmTaskId) { dispatch({ type: "DELETE_TASK", payload: { id: confirmTaskId } }); toast.success("Tarea eliminada"); } setConfirmTaskId(null); }}
+      />
     </div>
   );
 }
@@ -224,7 +253,7 @@ function useSprintMetrics(sprint: Sprint) {
   return { tasks, totalPts, donePts, inProgress, blocked, risk, done, totalDays, elapsed, remaining, completion, burndown };
 }
 
-function ActiveSprintPanel({ sprint, onComplete, onEdit, onAddTask, onMoveTask, dragId, setDragId }: any) {
+function ActiveSprintPanel({ sprint, onComplete, onEdit, onAddTask, onMoveTask, dragId, setDragId, onOpenTask }: any) {
   const { state, dispatch } = useWorkOS();
   const m = useSprintMetrics(sprint);
   const memberLoad = useMemo(() => {
@@ -340,7 +369,7 @@ function ActiveSprintPanel({ sprint, onComplete, onEdit, onAddTask, onMoveTask, 
                 className="rounded-lg border bg-card/60 p-2 min-h-[120px]">
                 <div className="flex items-center justify-between mb-2 px-1"><StatusBadge status={st} /><span className="text-[10px] tabular-nums text-muted-foreground">{items.length}</span></div>
                 <div className="space-y-1.5">
-                  {items.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} />)}
+                  {items.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} onClick={() => onOpenTask?.(t.id)} />)}
                 </div>
               </div>
             );
@@ -351,7 +380,7 @@ function ActiveSprintPanel({ sprint, onComplete, onEdit, onAddTask, onMoveTask, 
   );
 }
 
-function PlanningSprintPanel({ sprint, backlog, onStart, onEdit, onDelete, onAddTask, onMoveTask, dragId, setDragId, isOpen, onToggle }: any) {
+function PlanningSprintPanel({ sprint, backlog, onStart, onEdit, onDelete, onAddTask, onMoveTask, dragId, setDragId, isOpen, onToggle, onOpenTask }: any) {
   const m = useSprintMetrics(sprint);
   const overCapacity = m.totalPts > sprint.capacityPoints;
   return (
@@ -386,7 +415,7 @@ function PlanningSprintPanel({ sprint, backlog, onStart, onEdit, onDelete, onAdd
             </div>
             {m.tasks.length === 0 ? <div className="py-8 text-center text-xs text-muted-foreground italic">Arrastra tareas del backlog aquí →</div> :
               <div className="space-y-1.5 max-h-80 overflow-auto scrollbar-thin">
-                {m.tasks.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} onRemove={() => onMoveTask(t.id, null)} showRemove />)}
+                {m.tasks.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} onRemove={() => onMoveTask(t.id, null)} showRemove onClick={() => onOpenTask?.(t.id)} />)}
               </div>}
           </div>
           <div className="rounded-lg border bg-card p-3">
@@ -395,7 +424,7 @@ function PlanningSprintPanel({ sprint, backlog, onStart, onEdit, onDelete, onAdd
             </div>
             {backlog.length === 0 ? <div className="py-8 text-center text-xs text-muted-foreground italic">Backlog vacío 🎉</div> :
               <div className="space-y-1.5 max-h-80 overflow-auto scrollbar-thin">
-                {backlog.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} onAdd={() => onMoveTask(t.id, sprint.id)} showAdd />)}
+                {backlog.map((t: Task) => <SprintTaskCard key={t.id} task={t} onDragStart={() => setDragId(t.id)} onAdd={() => onMoveTask(t.id, sprint.id)} showAdd onClick={() => onOpenTask?.(t.id)} />)}
               </div>}
           </div>
         </div>
@@ -404,7 +433,7 @@ function PlanningSprintPanel({ sprint, backlog, onStart, onEdit, onDelete, onAdd
   );
 }
 
-function BacklogPanel({ backlog, onAddTask, onMove, onEdit, dragId, setDragId }: any) {
+function BacklogPanel({ backlog, onAddTask, onMove, onEdit, onOpenTask, dragId, setDragId }: any) {
   const { state } = useWorkOS();
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [prioFilter, setPrioFilter] = useState<string>("all");
@@ -447,7 +476,7 @@ function BacklogPanel({ backlog, onAddTask, onMove, onEdit, dragId, setDragId }:
                 <PriorityBadge priority={t.priority} />
                 {area && <AreaPill name={area.name} color={area.color} />}
                 <div className="flex-1 min-w-0">
-                  <button onClick={() => onEdit(t.id)} className="font-medium text-sm text-foreground hover:text-primary text-left truncate block w-full">{t.title}</button>
+                  <button onClick={() => onOpenTask ? onOpenTask(t.id) : onEdit(t.id)} className="font-medium text-sm text-foreground hover:text-primary text-left truncate block w-full">{t.title}</button>
                   {t.description && <div className="text-xs text-muted-foreground truncate">{t.description}</div>}
                 </div>
                 <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold tabular-nums">{t.storyPoints} pts</span>
@@ -507,12 +536,12 @@ function Stat({ label, value, sub, tone, progress }: { label: string; value: any
   );
 }
 
-function SprintTaskCard({ task, onDragStart, onRemove, onAdd, showRemove, showAdd }: { task: Task; onDragStart: () => void; onRemove?: () => void; onAdd?: () => void; showRemove?: boolean; showAdd?: boolean }) {
+function SprintTaskCard({ task, onDragStart, onRemove, onAdd, showRemove, showAdd, onClick }: { task: Task; onDragStart: () => void; onRemove?: () => void; onAdd?: () => void; showRemove?: boolean; showAdd?: boolean; onClick?: () => void }) {
   const { state } = useWorkOS();
   const area = state.areas.find(a => a.id === task.areaId);
   const members = task.assigneeIds.map(id => state.members.find(m => m.id === id)).filter(Boolean) as any[];
   return (
-    <div draggable onDragStart={onDragStart} className="group rounded-md border bg-card p-2 shadow-xs hover:shadow-soft cursor-grab active:cursor-grabbing transition">
+    <div draggable onDragStart={onDragStart} onClick={onClick} className="group rounded-md border bg-card p-2 shadow-xs hover:shadow-soft hover:border-primary/40 cursor-pointer transition">
       <div className="flex items-center gap-2">
         <span className="rounded bg-muted text-foreground px-1.5 py-0.5 text-[10px] font-bold tabular-nums">{task.storyPoints}</span>
         <span className="text-xs font-medium flex-1 truncate">{task.title}</span>
@@ -522,8 +551,8 @@ function SprintTaskCard({ task, onDragStart, onRemove, onAdd, showRemove, showAd
         {area && <AreaPill name={area.name} color={area.color} className="text-[10px]" />}
         <div className="flex items-center gap-1.5">
           {members.length > 0 && <AvatarStack size="xs" members={members.map(m => ({ initials: m.initials, color: m.color, name: m.name }))} max={3} />}
-          {showRemove && <button onClick={onRemove} className="rounded p-0.5 hover:bg-destructive/10 text-destructive opacity-0 group-hover:opacity-100" title="Mover a backlog"><ArrowDown className="h-3 w-3" /></button>}
-          {showAdd && <button onClick={onAdd} className="rounded p-0.5 hover:bg-primary/10 text-primary opacity-0 group-hover:opacity-100" title="Añadir al sprint"><ArrowRight className="h-3 w-3" /></button>}
+          {showRemove && <button onClick={(e) => { e.stopPropagation(); onRemove?.(); }} className="rounded p-0.5 hover:bg-destructive/10 text-destructive opacity-0 group-hover:opacity-100" title="Mover a backlog"><ArrowDown className="h-3 w-3" /></button>}
+          {showAdd && <button onClick={(e) => { e.stopPropagation(); onAdd?.(); }} className="rounded p-0.5 hover:bg-primary/10 text-primary opacity-0 group-hover:opacity-100" title="Añadir al sprint"><ArrowRight className="h-3 w-3" /></button>}
         </div>
       </div>
       {task.progress > 0 && <ProgressBar value={task.progress} className="mt-1.5" />}

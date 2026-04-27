@@ -1,12 +1,19 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useWorkOS } from "@/store/workos-store";
 import { ProgressBar } from "../Badges";
 import { Activity, AlertOctagon, AlertTriangle, BarChart3, CheckCircle2, Circle, CircleDot, Clock, FolderKanban, Radio, TrendingUp, Zap, Plus, ExternalLink, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, isBefore, startOfDay } from "date-fns";
+import { TaskDetailDialog } from "../TaskDetailDialog";
+import { TaskDialog } from "../TaskDialog";
+import { ConfirmDialog } from "../ConfirmDialog";
+import { toast } from "sonner";
 
 export function DashboardView({ onCreateTask, onOpenControlTower }: { onCreateTask: () => void; onOpenControlTower: () => void }) {
-  const { state } = useWorkOS();
+  const { state, dispatch } = useWorkOS();
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   const tasks = state.tasks;
   const total = tasks.length;
   const today = startOfDay(new Date());
@@ -81,12 +88,12 @@ export function DashboardView({ onCreateTask, onOpenControlTower }: { onCreateTa
             {overdue.map(t => {
               const area = state.areas.find(a => a.id === t.areaId);
               return (
-                <div key={t.id} className="flex items-center gap-3 py-1.5 text-sm">
+                <button key={t.id} onClick={() => setDetailId(t.id)} className="w-full flex items-center gap-3 py-1.5 text-sm text-left hover:bg-warning/10 rounded px-2 -mx-2 transition">
                   <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: area?.color }} />
                   <span className="font-medium flex-1 truncate">{t.title}</span>
                   <span className="text-xs text-muted-foreground">{area?.name}</span>
                   <span className="text-xs font-mono text-warning tabular-nums">{format(new Date(t.endDate), "yyyy-MM-dd")}</span>
-                </div>
+                </button>
               );
             })}
           </div>}
@@ -97,11 +104,11 @@ export function DashboardView({ onCreateTask, onOpenControlTower }: { onCreateTa
         {completedRecent.length === 0 ? <p className="text-sm text-center text-muted-foreground italic py-4">Sin tareas completadas aún</p> :
           <div className="divide-y">
             {completedRecent.map(t => (
-              <div key={t.id} className="flex items-center gap-3 py-2 text-sm">
+              <button key={t.id} onClick={() => setDetailId(t.id)} className="w-full flex items-center gap-3 py-2 text-sm text-left hover:bg-muted rounded px-2 -mx-2 transition">
                 <CheckCircle2 className="h-4 w-4 text-success" />
                 <span className="font-medium flex-1 truncate">{t.title}</span>
                 <span className="text-xs text-muted-foreground tabular-nums">{t.completedAt ? format(new Date(t.completedAt), "yyyy-MM-dd") : "—"}</span>
-              </div>
+              </button>
             ))}
           </div>}
       </Panel>
@@ -117,6 +124,22 @@ export function DashboardView({ onCreateTask, onOpenControlTower }: { onCreateTa
         <Button variant="outline" size="sm" onClick={onOpenControlTower} className="gap-1.5"><ExternalLink className="h-3.5 w-3.5" />Abrir Control Tower</Button>
         <Button onClick={onCreateTask} size="sm" className="gap-1.5 bg-gradient-primary text-primary-foreground hover:opacity-90"><Plus className="h-4 w-4" />Nueva tarea</Button>
       </div>
+
+      <TaskDetailDialog
+        open={!!detailId}
+        onOpenChange={(o) => !o && setDetailId(null)}
+        taskId={detailId}
+        onEdit={(id) => { setDetailId(null); setEditId(id); }}
+        onDelete={(id) => { setDetailId(null); setConfirmId(id); }}
+      />
+      <TaskDialog open={!!editId} onOpenChange={(o) => !o && setEditId(null)} taskId={editId} />
+      <ConfirmDialog
+        open={!!confirmId}
+        onOpenChange={(o) => !o && setConfirmId(null)}
+        title="Eliminar tarea"
+        confirmLabel="Eliminar"
+        onConfirm={() => { if (confirmId) { dispatch({ type: "DELETE_TASK", payload: { id: confirmId } }); toast.success("Tarea eliminada"); } setConfirmId(null); }}
+      />
     </div>
   );
 }

@@ -75,7 +75,7 @@ export function AppShell() {
       <main className="mx-auto max-w-[1400px] px-4 lg:px-6 py-5">
         <div className="animate-fade-in">
           {tab === "portfolio" && <PortfolioView onCreateTask={() => setTaskDlg({ open: true, id: null })} />}
-          {tab === "timeline"  && <TimelineView onCreateTask={() => setTaskDlg({ open: true, id: null })} />}
+          {tab === "timeline"  && <TimelineView onCreateTask={() => setTaskDlg({ open: true, id: null })} onEditTask={(id) => setTaskDlg({ open: true, id })} />}
           {tab === "board"     && <BoardView onCreateTask={(s) => setTaskDlg({ open: true, id: null, status: s })} onEdit={(id) => setTaskDlg({ open: true, id })} />}
           {tab === "sprints"   && <SprintsView />}
           {tab === "dashboard" && <DashboardView onCreateTask={() => setTaskDlg({ open: true, id: null })} onOpenControlTower={() => toast.info("Control Tower próximamente")} />}
