@@ -18,12 +18,13 @@ const PRIO_COLOR: Record<TaskPriority, string> = {
   baja:    "hsl(var(--prio-low))",
 };
 
-export function TimelineView({ onCreateTask }: { onCreateTask: () => void }) {
+export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () => void; onEditTask: (id: string) => void }) {
   const { state, dispatch } = useWorkOS();
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [prioFilter, setPrioFilter] = useState<string>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const DAYS = 28;
   const start = useMemo(() => addDays(startOfDay(new Date()), offset - 2), [offset]);
@@ -143,8 +144,8 @@ export function TimelineView({ onCreateTask }: { onCreateTask: () => void }) {
             </div>
             <div className="mt-1 text-xs text-muted-foreground">ID: {selected.id}</div>
             <div className="mt-3 flex gap-2">
-              <Button size="sm" variant="outline" className="gap-1.5 flex-1"><Pencil className="h-3.5 w-3.5" /> Editar</Button>
-              <Button size="icon" variant="outline" onClick={() => { dispatch({ type: "DELETE_TASK", payload: { id: selected.id } }); setSelectedId(null); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              <Button size="sm" variant="outline" className="gap-1.5 flex-1" onClick={() => onEditTask(selected.id)}><Pencil className="h-3.5 w-3.5" /> Editar</Button>
+              <Button size="icon" variant="outline" onClick={() => setConfirmDelete(true)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
             </div>
             <div className="mt-3 flex items-center gap-2"><StatusBadge status={selected.status} /><PriorityBadge priority={selected.priority} /></div>
             <div className="mt-4">
