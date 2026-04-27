@@ -1,0 +1,252 @@
+import { useMemo, useState } from "react";
+import { useWorkOS } from "@/store/workos-store";
+import { format, addDays, differenceInCalendarDays, startOfDay } from "date-fns";
+import { es } from "date-fns/locale";
+import { ProgressBar, PriorityBadge, StatusBadge } from "../Badges";
+import { AvatarStack, MemberAvatar } from "../Avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Activity, AlertOctagon, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Trash2, Users, X, Zap, Flame, Route } from "lucide-react";
+import { useWorkOS as _ } from "@/store/workos-store";
+import type { Task, TaskPriority } from "@/lib/types";
+import { Bell } from "lucide-react";
+
+const PRIO_COLOR: Record<TaskPriority, string> = {
+  urgente: "hsl(var(--prio-urgent))",
+  alta:    "hsl(var(--prio-high))",
+  media:   "hsl(var(--prio-medium))",
+  baja:    "hsl(var(--prio-low))",
+};
+
+export function TimelineView({ onCreateTask }: { onCreateTask: () => void }) {
+  const { state, dispatch } = useWorkOS();
+  const [areaFilter, setAreaFilter] = useState<string>("all");
+  const [prioFilter, setPrioFilter] = useState<string>("all");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
+
+  const DAYS = 28;
+  const start = useMemo(() => addDays(startOfDay(new Date()), offset - 2), [offset]);
+  const days = useMemo(() => Array.from({ length: DAYS }, (_, i) => addDays(start, i)), [start]);
+
+  const tasks = state.tasks.filter(t =>
+    (areaFilter === "all" || t.areaId === areaFilter) &&
+    (prioFilter === "all" || t.priority === prioFilter)
+  );
+
+  const teams = state.areas
+    .map(area => {
+      const at = tasks.filter(t => t.areaId === area.id);
+      if (at.length === 0) return null;
+      const memberIds = Array.from(new Set(at.flatMap(t => t.assigneeIds)));
+      const lead = state.members.find(m => memberIds.includes(m.id));
+      const avg = Math.round(at.reduce((s, t) => s + t.progress, 0) / at.length);
+      return { area, tasks: at, members: memberIds.map(id => state.members.find(m => m.id === id)!).filter(Boolean), lead, avg };
+    })
+    .filter(Boolean) as any[];
+
+  const totalTasks = tasks.length;
+  const completed = tasks.filter(t => t.status === "completada").length;
+  const risk = tasks.filter(t => t.status === "en_riesgo").length;
+  const blocked = tasks.filter(t => t.status === "bloqueada").length;
+  const progressGlobal = totalTasks ? Math.round(tasks.reduce((s, t) => s + t.progress, 0) / totalTasks) : 0;
+
+  const selected = selectedId ? state.tasks.find(t => t.id === selectedId) : null;
+
+  return (
+    <div className="space-y-4">
+      {/* KPIs */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2 shadow-soft">
+        <KPI icon={Users} label="Equipos" value={teams.length} />
+        <KPI icon={Activity} label="Tareas" value={totalTasks} />
+        <KPI icon={Activity} label="Progreso" value={`${progressGlobal}%`} accent="primary" />
+        <KPI icon={CheckCircle2} label="Completadas" value={completed} accent="success" />
+        <KPI icon={Zap} label="En riesgo" value={risk} accent="warning" />
+        <KPI icon={AlertOctagon} label="Bloqueadas" value={blocked} accent="destructive" />
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5"><Flame className="h-3.5 w-3.5" /> Heatmap</Button>
+          <Button variant="outline" size="sm" className="gap-1.5"><Route className="h-3.5 w-3.5" /> Ruta crítica</Button>
+          <button className="relative rounded-md p-1.5 hover:bg-muted">
+            <Bell className="h-4 w-4 text-muted-foreground" />
+            {risk + blocked > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground flex items-center justify-center px-1">{risk + blocked}</span>}
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card px-4 py-2 shadow-soft">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Área</span>
+          <Select value={areaFilter} onValueChange={setAreaFilter}>
+            <SelectTrigger className="h-8 w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las visibles</SelectItem>
+              {state.areas.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Prioridad</span>
+          <Select value={prioFilter} onValueChange={setPrioFilter}>
+            <SelectTrigger className="h-8 w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toda prioridad</SelectItem>
+              <SelectItem value="urgente">Urgente</SelectItem>
+              <SelectItem value="alta">Alta</SelectItem>
+              <SelectItem value="media">Media</SelectItem>
+              <SelectItem value="baja">Baja</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="ml-auto flex items-center gap-1">
+          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setOffset(o => o - 7)}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button size="sm" variant="outline" className="h-8" onClick={() => setOffset(0)}>Hoy</Button>
+          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setOffset(o => o + 7)}><ChevronRight className="h-4 w-4" /></Button>
+          <span className="ml-2 text-xs text-muted-foreground">{totalTasks} tareas en vista</span>
+        </div>
+      </div>
+
+      {/* Gantt */}
+      <div className="grid grid-cols-[1fr_auto] gap-4">
+        <div className="rounded-xl border bg-card shadow-soft overflow-hidden">
+          <div className="overflow-x-auto scrollbar-thin">
+            <div className="grid grid-cols-timeline" style={{ ['--days' as any]: DAYS }}>
+              {/* Header */}
+              <div className="border-b bg-muted/30 px-3 py-2 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Equipos</div>
+              {days.map((d, i) => {
+                const isToday = differenceInCalendarDays(d, startOfDay(new Date())) === 0;
+                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                return (
+                  <div key={i} className={`border-b border-l text-center py-1.5 text-[10px] leading-tight ${isToday ? "bg-primary/10 text-primary font-bold" : isWeekend ? "bg-muted/40 text-muted-foreground" : "bg-muted/20 text-muted-foreground"}`}>
+                    <div className="uppercase">{format(d, "EEE", { locale: es })}</div>
+                    <div className="font-semibold">{format(d, "d MMM", { locale: es })}</div>
+                  </div>
+                );
+              })}
+
+              {teams.map(team => (
+                <TeamRows key={team.area.id} team={team} days={days} start={start} onSelect={setSelectedId} />
+              ))}
+            </div>
+          </div>
+          {teams.length === 0 && (
+            <div className="p-12 text-center text-sm text-muted-foreground">Sin tareas en el rango actual. Crea una nueva o ajusta los filtros.</div>
+          )}
+        </div>
+
+        {/* Detail panel */}
+        {selected && (
+          <aside className="w-80 rounded-xl border bg-card shadow-elevated p-4 animate-slide-in-right">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-display font-semibold text-foreground leading-tight">{selected.title}</h3>
+              <button onClick={() => setSelectedId(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">ID: {selected.id}</div>
+            <div className="mt-3 flex gap-2">
+              <Button size="sm" variant="outline" className="gap-1.5 flex-1"><Pencil className="h-3.5 w-3.5" /> Editar</Button>
+              <Button size="icon" variant="outline" onClick={() => { dispatch({ type: "DELETE_TASK", payload: { id: selected.id } }); setSelectedId(null); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+            </div>
+            <div className="mt-3 flex items-center gap-2"><StatusBadge status={selected.status} /><PriorityBadge priority={selected.priority} /></div>
+            <div className="mt-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Descripción</div>
+              <p className="mt-1 text-sm">{selected.description || <span className="italic text-muted-foreground">Sin descripción</span>}</p>
+            </div>
+            <div className="mt-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Asignado</div>
+              <div className="mt-2 space-y-1.5">
+                {selected.assigneeIds.length === 0 ? <div className="text-xs text-muted-foreground italic">Sin asignar</div> :
+                  selected.assigneeIds.map(id => {
+                    const m = state.members.find(x => x.id === id); if (!m) return null;
+                    return <div key={id} className="flex items-center gap-2 rounded-lg bg-muted/40 px-2 py-1.5">
+                      <MemberAvatar initials={m.initials} color={m.color} />
+                      <div className="flex-1 min-w-0"><div className="text-xs font-medium truncate">{m.name}</div><div className="text-[10px] text-muted-foreground uppercase">{m.role}</div></div>
+                    </div>;
+                  })}
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">Progreso</span><span className="font-semibold">{selected.progress}%</span></div>
+              <ProgressBar value={selected.progress} className="mt-1" />
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+              <div><div className="text-muted-foreground">Inicio</div><div className="font-medium">{format(new Date(selected.startDate), "d MMM", { locale: es })}</div></div>
+              <div><div className="text-muted-foreground">Fin</div><div className="font-medium">{format(new Date(selected.endDate), "d MMM", { locale: es })}</div></div>
+              <div><div className="text-muted-foreground">Duración</div><div className="font-medium">{differenceInCalendarDays(new Date(selected.endDate), new Date(selected.startDate)) + 1} días</div></div>
+            </div>
+          </aside>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TeamRows({ team, days, start, onSelect }: { team: any; days: Date[]; start: Date; onSelect: (id: string) => void }) {
+  const { state } = useWorkOS();
+  return (
+    <>
+      <div className="border-b border-l-0 px-3 py-3 bg-card">
+        <div className="font-semibold text-sm" style={{ color: team.area.color }}>{team.area.name}</div>
+        <div className="mt-1 flex items-center gap-2">
+          <AvatarStack size="xs" members={team.members.map((m: any) => ({ initials: m.initials, color: m.color, name: m.name }))} />
+          <ProgressBar value={team.avg} className="w-16" />
+          <span className="text-[10px] font-semibold tabular-nums">{team.avg}%</span>
+        </div>
+        {team.lead && (
+          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <MemberAvatar initials={team.lead.initials} color={team.lead.color} size="xs" />
+            <span className="truncate">{team.lead.name.split(" ").slice(0,2).join(" ")}</span>
+            <span className="ml-auto rounded bg-muted px-1.5 py-0.5 font-semibold uppercase tracking-wider">{team.lead.role}</span>
+          </div>
+        )}
+      </div>
+      {days.map((d, i) => {
+        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        const isToday = differenceInCalendarDays(d, startOfDay(new Date())) === 0;
+        return <div key={i} className={`border-b border-l ${isToday ? "bg-primary/5" : isWeekend ? "bg-muted/30" : ""}`} />;
+      })}
+      {/* Bars row */}
+      <div className="col-span-full relative" style={{ gridColumn: `1 / span ${days.length + 1}` }}>
+        <div className="grid grid-cols-timeline" style={{ ['--days' as any]: days.length }}>
+          <div className="border-b" />
+          <div className="border-b col-span-full relative" style={{ gridColumn: `2 / span ${days.length}`, minHeight: team.tasks.length * 28 + 12 }}>
+            {team.tasks.map((t: any, idx: number) => {
+              const ts = startOfDay(new Date(t.startDate));
+              const te = startOfDay(new Date(t.endDate));
+              const dayStart = Math.max(0, differenceInCalendarDays(ts, start));
+              const dayEnd = Math.min(days.length - 1, differenceInCalendarDays(te, start));
+              if (dayEnd < 0 || dayStart > days.length - 1) return null;
+              const span = dayEnd - dayStart + 1;
+              const color = PRIO_COLOR[t.priority as TaskPriority];
+              const left = `calc(${dayStart} * (100% / ${days.length}))`;
+              const width = `calc(${span} * (100% / ${days.length}) - 4px)`;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => onSelect(t.id)}
+                  className="absolute h-6 rounded-md text-[10px] text-white font-medium px-2 truncate hover:ring-2 hover:ring-offset-1 transition-all overflow-hidden flex items-center gap-1.5 shadow-soft"
+                  style={{ left, width, top: idx * 28 + 6, backgroundColor: color }}
+                >
+                  <span className="truncate">{t.title}</span>
+                  <span className="ml-auto bg-black/20 rounded px-1 text-[9px] tabular-nums">{t.progress}%</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function KPI({ icon: Icon, label, value, accent }: { icon: any; label: string; value: any; accent?: "primary" | "success" | "warning" | "destructive" }) {
+  const tone = accent === "success" ? "text-success" : accent === "warning" ? "text-warning" : accent === "destructive" ? "text-destructive" : accent === "primary" ? "text-primary" : "text-foreground";
+  return (
+    <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 hover:bg-muted/40 transition">
+      <Icon className={`h-4 w-4 ${tone}`} />
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</div>
+        <div className={`text-sm font-semibold tabular-nums ${tone}`}>{value}</div>
+      </div>
+    </div>
+  );
+}
