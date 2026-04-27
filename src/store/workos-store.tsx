@@ -16,6 +16,8 @@ type Action =
   | { type: "SET_SPRINT_STATUS"; payload: { id: string; status: SprintStatus } }
   | { type: "DELETE_SPRINT"; payload: { id: string } }
   | { type: "ADD_AREA"; payload: Area }
+  | { type: "UPDATE_AREA"; payload: { id: string; patch: Partial<Area> } }
+  | { type: "DELETE_AREA"; payload: { id: string } }
   | { type: "RESET" };
 
 function reducer(state: State, action: Action): State {
@@ -54,6 +56,18 @@ function reducer(state: State, action: Action): State {
       tasks: state.tasks.map(t => t.sprintId === action.payload.id ? { ...t, sprintId: null } : t),
     };
     case "ADD_AREA": return { ...state, areas: [...state.areas, action.payload] };
+    case "UPDATE_AREA": return {
+      ...state, areas: state.areas.map(a => a.id === action.payload.id ? { ...a, ...action.payload.patch } : a)
+    };
+    case "DELETE_AREA": {
+      const remaining = state.areas.filter(a => a.id !== action.payload.id);
+      const fallback = remaining[0]?.id ?? "";
+      return {
+        ...state,
+        areas: remaining,
+        tasks: state.tasks.map(t => t.areaId === action.payload.id ? { ...t, areaId: fallback } : t),
+      };
+    }
     case "RESET": return seed;
     default: return state;
   }
