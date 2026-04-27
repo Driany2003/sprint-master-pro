@@ -6,6 +6,9 @@ import { AlertOctagon, AlertTriangle, CalendarDays, CheckCircle2, Circle, Circle
 import { AreaPill, PriorityBadge, ProgressBar } from "../Badges";
 import { AvatarStack } from "../Avatar";
 import { format } from "date-fns";
+import { ConfirmDialog } from "../ConfirmDialog";
+import { TaskDetailDialog } from "../TaskDetailDialog";
+import { toast } from "sonner";
 
 const COLUMNS: { status: TaskStatus; Icon: any; tone: string }[] = [
   { status: "pendiente",   Icon: Circle,         tone: "text-muted-foreground border-border" },
@@ -18,6 +21,8 @@ const COLUMNS: { status: TaskStatus; Icon: any; tone: string }[] = [
 export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: TaskStatus) => void; onEdit: (id: string) => void }) {
   const { state, dispatch } = useWorkOS();
   const [dragId, setDragId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   function onDrop(status: TaskStatus) {
     if (!dragId) return;
@@ -55,7 +60,8 @@ export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: Ta
                     key={t.id}
                     draggable
                     onDragStart={() => setDragId(t.id)}
-                    className="group rounded-lg border bg-card p-3 shadow-xs hover:shadow-md cursor-grab active:cursor-grabbing transition animate-fade-in"
+                    onClick={() => setDetailId(t.id)}
+                    className="group rounded-lg border bg-card p-3 shadow-xs hover:shadow-md cursor-pointer transition animate-fade-in"
                   >
                     <div className="flex items-center justify-between gap-2">
                       {area && <AreaPill name={area.name} color={area.color} />}
@@ -76,8 +82,8 @@ export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: Ta
                       </span>
                     </div>
                     <div className="mt-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition justify-end">
-                      <button onClick={() => onEdit(t.id)} className="rounded p-1 hover:bg-muted"><Pencil className="h-3 w-3" /></button>
-                      <button onClick={() => dispatch({ type: "DELETE_TASK", payload: { id: t.id } })} className="rounded p-1 hover:bg-destructive/10 text-destructive"><Trash2 className="h-3 w-3" /></button>
+                      <button onClick={(e) => { e.stopPropagation(); onEdit(t.id); }} className="rounded p-1 hover:bg-muted"><Pencil className="h-3 w-3" /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setConfirmId(t.id); }} className="rounded p-1 hover:bg-destructive/10 text-destructive"><Trash2 className="h-3 w-3" /></button>
                     </div>
                   </div>
                 );
@@ -89,6 +95,21 @@ export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: Ta
           </div>
         );
       })}
+      <TaskDetailDialog
+        open={!!detailId}
+        onOpenChange={(o) => !o && setDetailId(null)}
+        taskId={detailId}
+        onEdit={(id) => { setDetailId(null); onEdit(id); }}
+        onDelete={(id) => { setDetailId(null); setConfirmId(id); }}
+      />
+      <ConfirmDialog
+        open={!!confirmId}
+        onOpenChange={(o) => !o && setConfirmId(null)}
+        title="Eliminar tarea"
+        description="La tarea se eliminará permanentemente del board."
+        confirmLabel="Eliminar"
+        onConfirm={() => { if (confirmId) { dispatch({ type: "DELETE_TASK", payload: { id: confirmId } }); toast.success("Tarea eliminada"); } setConfirmId(null); }}
+      />
     </div>
   );
 }
