@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useWorkOS } from "@/store/workos-store";
+import { useAuth } from "@/store/auth-store";
+import { useProjectData } from "@/store/use-project-data";
 import type { Sprint, Task } from "@/lib/types";
 import { differenceInCalendarDays, format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -17,6 +19,8 @@ import { TaskDetailDialog } from "../TaskDetailDialog";
 
 export function SprintsView() {
   const { state, dispatch } = useWorkOS();
+  const { tasks: projectTasks, sprints: projectSprints } = useProjectData();
+  const { can } = useAuth();
   const [sprintDlg, setSprintDlg] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [taskDlg, setTaskDlg] = useState<{ open: boolean; id: string | null; sprintId: string | null }>({ open: false, id: null, sprintId: null });
   const [tab, setTab] = useState<"active" | "planning" | "backlog" | "completed">("active");
@@ -26,15 +30,15 @@ export function SprintsView() {
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [confirmTaskId, setConfirmTaskId] = useState<string | null>(null);
 
-  const sprints = state.sprints;
+  const sprints = projectSprints;
   const active = sprints.filter(s => s.status === "activo");
   const planning = sprints.filter(s => s.status === "planificacion");
   const completed = sprints.filter(s => s.status === "completado");
-  const backlog = state.tasks.filter(t => !t.sprintId && t.status !== "completada");
+  const backlog = projectTasks.filter(t => !t.sprintId && t.status !== "completada");
 
   // Velocity from completed sprints
   const velocityData = completed.slice().reverse().map(s => {
-    const ts = state.tasks.filter(t => t.sprintId === s.id);
+    const ts = projectTasks.filter(t => t.sprintId === s.id);
     return {
       name: s.name.split("·")[0].trim(),
       planificado: ts.reduce((a, t) => a + t.storyPoints, 0),
@@ -44,15 +48,18 @@ export function SprintsView() {
   const avgVelocity = velocityData.length ? Math.round(velocityData.reduce((a, v) => a + v.completado, 0) / velocityData.length) : 0;
 
   function moveTaskToSprint(taskId: string, sprintId: string | null) {
+    if (!can("sprint.manage")) { toast.error("Solo administradores pueden mover tareas entre sprints"); return; }
     dispatch({ type: "MOVE_TASK_SPRINT", payload: { id: taskId, sprintId } });
     toast.success(sprintId ? "Tarea movida al sprint" : "Tarea devuelta al backlog");
   }
 
   function startSprint(s: Sprint) {
+    if (!can("sprint.manage")) { toast.error("No tienes permisos para iniciar sprints"); return; }
     dispatch({ type: "SET_SPRINT_STATUS", payload: { id: s.id, status: "activo" } });
     toast.success(`${s.name} iniciado`);
   }
   function completeSprint(s: Sprint) {
+    if (!can("sprint.manage")) { toast.error("No tienes permisos para cerrar sprints"); return; }
     dispatch({ type: "SET_SPRINT_STATUS", payload: { id: s.id, status: "completado" } });
     toast.success(`${s.name} completado`);
   }
@@ -92,9 +99,11 @@ export function SprintsView() {
             </button>
           ))}
         </div>
-        <Button onClick={() => setSprintDlg({ open: true, id: null })} className="gap-1.5 bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-soft">
-          <Plus className="h-4 w-4" /> Nuevo sprint
-        </Button>
+        {can("sprint.manage") && (
+          <Button onClick={() => setSprintDlg({ open: true, id: null })} className="gap-1.5 bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-soft">
+            <Plus className="h-4 w-4" /> Nuevo sprint
+          </Button>
+        )}
       </div>
 
       {/* Content per tab */}
