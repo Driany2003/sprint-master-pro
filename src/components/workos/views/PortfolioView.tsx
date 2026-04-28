@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useWorkOS } from "@/store/workos-store";
+import { useAuth } from "@/store/auth-store";
+import { useProjectData } from "@/store/use-project-data";
 import { ChevronDown, ChevronRight, FolderKanban, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react";
 import { ProgressBar } from "../Badges";
 import { AvatarStack } from "../Avatar";
@@ -12,7 +14,9 @@ import { toast } from "sonner";
 
 export function PortfolioView({ onCreateTask }: { onCreateTask: () => void }) {
   const { state, dispatch } = useWorkOS();
-  const project = state.projects.find(p => p.id === state.activeProjectId)!;
+  const { project, tasks: projectTasks } = useProjectData();
+  const { can } = useAuth();
+  if (!project) return null;
   const [openProj, setOpenProj] = useState(true);
   const [openAreas, setOpenAreas] = useState<Record<string, boolean>>({});
 
@@ -22,7 +26,6 @@ export function PortfolioView({ onCreateTask }: { onCreateTask: () => void }) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [confirmTask, setConfirmTask] = useState<string | null>(null);
 
-  const projectTasks = state.tasks.filter(t => t.projectId === project.id);
   const projectProgress = projectTasks.length
     ? Math.round(projectTasks.reduce((s, t) => s + t.progress, 0) / projectTasks.length)
     : 0;
@@ -42,9 +45,11 @@ export function PortfolioView({ onCreateTask }: { onCreateTask: () => void }) {
       {/* Project header actions */}
       <div className="flex items-center justify-between">
         <div className="text-xs text-muted-foreground">{state.areas.length} áreas · {projectTasks.length} tareas</div>
-        <Button size="sm" onClick={() => setAreaDlg({ open: true, id: null })} className="gap-1.5 bg-gradient-primary text-primary-foreground hover:opacity-90">
-          <Plus className="h-4 w-4" /> Nueva área
-        </Button>
+        {can("area.manage") && (
+          <Button size="sm" onClick={() => setAreaDlg({ open: true, id: null })} className="gap-1.5 bg-gradient-primary text-primary-foreground hover:opacity-90">
+            <Plus className="h-4 w-4" /> Nueva área
+          </Button>
+        )}
       </div>
 
       {/* Project row */}
@@ -95,9 +100,9 @@ export function PortfolioView({ onCreateTask }: { onCreateTask: () => void }) {
               <span className="text-xs text-muted-foreground tabular-nums">{done}/{tasks.length}</span>
               <div className="w-28"><ProgressBar value={prog} /></div>
               <span className="text-xs text-foreground font-semibold tabular-nums w-9 text-right">{prog}%</span>
-              <button title="Añadir tarea al área" className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); setTaskDlg({ open: true, id: null, areaId: area.id }); }}><Plus className="h-4 w-4" /></button>
-              <button title="Editar área" className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); setAreaDlg({ open: true, id: area.id }); }}><Pencil className="h-3.5 w-3.5" /></button>
-              <button title="Eliminar área" className="rounded p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); setConfirmArea(area.id); }}><Trash2 className="h-3.5 w-3.5" /></button>
+              {can("task.create") && <button title="Añadir tarea al área" className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); setTaskDlg({ open: true, id: null, areaId: area.id }); }}><Plus className="h-4 w-4" /></button>}
+              {can("area.manage") && <button title="Editar área" className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); setAreaDlg({ open: true, id: area.id }); }}><Pencil className="h-3.5 w-3.5" /></button>}
+              {can("area.manage") && <button title="Eliminar área" className="rounded p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); setConfirmArea(area.id); }}><Trash2 className="h-3.5 w-3.5" /></button>}
             </div>
             {open && (
               <div className="border-t bg-muted/20 px-12 py-4 space-y-2">
