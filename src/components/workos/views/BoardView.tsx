@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useWorkOS } from "@/store/workos-store";
+import { useAuth } from "@/store/auth-store";
+import { useProjectData } from "@/store/use-project-data";
 import type { TaskStatus } from "@/lib/types";
 import { STATUS_LABEL } from "@/lib/types";
 import { AlertOctagon, AlertTriangle, CalendarDays, CheckCircle2, Circle, CircleDot, Pencil, Plus, Trash2 } from "lucide-react";
@@ -20,12 +22,19 @@ const COLUMNS: { status: TaskStatus; Icon: any; tone: string }[] = [
 
 export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: TaskStatus) => void; onEdit: (id: string) => void }) {
   const { state, dispatch } = useWorkOS();
+  const { tasks: projectTasks } = useProjectData();
+  const { can } = useAuth();
   const [dragId, setDragId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   function onDrop(status: TaskStatus) {
     if (!dragId) return;
+    const task = state.tasks.find(t => t.id === dragId) || null;
+    if (!can("task.moveStatus", { task })) {
+      toast.error("Solo puedes mover tareas asignadas a ti");
+      setDragId(null); return;
+    }
     dispatch({ type: "MOVE_TASK_STATUS", payload: { id: dragId, status } });
     setDragId(null);
   }
@@ -33,7 +42,7 @@ export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: Ta
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
       {COLUMNS.map(col => {
-        const items = state.tasks.filter(t => t.status === col.status);
+        const items = projectTasks.filter(t => t.status === col.status);
         const Icon = col.Icon;
         return (
           <div
@@ -55,10 +64,11 @@ export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: Ta
               ) : items.map(t => {
                 const area = state.areas.find(a => a.id === t.areaId);
                 const members = t.assigneeIds.map(id => state.members.find(m => m.id === id)).filter(Boolean) as any[];
+                const canEdit = can("task.editAny") || can("task.editOwn", { task: t });
                 return (
                   <div
                     key={t.id}
-                    draggable
+                    draggable={can("task.moveStatus", { task: t })}
                     onDragStart={() => setDragId(t.id)}
                     onClick={() => setDetailId(t.id)}
                     className="group rounded-lg border bg-card p-3 shadow-xs hover:shadow-md cursor-pointer transition animate-fade-in"
@@ -82,16 +92,16 @@ export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: Ta
                       </span>
                     </div>
                     <div className="mt-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition justify-end">
-                      <button onClick={(e) => { e.stopPropagation(); onEdit(t.id); }} className="rounded p-1 hover:bg-muted"><Pencil className="h-3 w-3" /></button>
-                      <button onClick={(e) => { e.stopPropagation(); setConfirmId(t.id); }} className="rounded p-1 hover:bg-destructive/10 text-destructive"><Trash2 className="h-3 w-3" /></button>
+                      {canEdit && <button onClick={(e) => { e.stopPropagation(); onEdit(t.id); }} className="rounded p-1 hover:bg-muted"><Pencil className="h-3 w-3" /></button>}
+                      {can("task.editAny") && <button onClick={(e) => { e.stopPropagation(); setConfirmId(t.id); }} className="rounded p-1 hover:bg-destructive/10 text-destructive"><Trash2 className="h-3 w-3" /></button>}
                     </div>
                   </div>
                 );
               })}
             </div>
-            <button onClick={() => onCreateTask(col.status)} className="m-2 mt-0 inline-flex items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-xs text-muted-foreground hover:border-primary hover:text-primary transition">
+            {can("task.create") && <button onClick={() => onCreateTask(col.status)} className="m-2 mt-0 inline-flex items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-xs text-muted-foreground hover:border-primary hover:text-primary transition">
               <Plus className="h-3.5 w-3.5" /> Añadir tarea
-            </button>
+            </button>}
           </div>
         );
       })}

@@ -1,11 +1,15 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
 import { seed } from "@/lib/seed";
-import type { State, Task, Sprint, Area, TaskStatus, SprintStatus } from "@/lib/types";
+import type { State, Task, Sprint, Area, Project, TaskStatus, SprintStatus } from "@/lib/types";
 
-const KEY = "workos-state-v3";
+const KEY = "workos-state-v4";
 
 type Action =
   | { type: "HYDRATE"; payload: State }
+  | { type: "SET_ACTIVE_PROJECT"; payload: { id: string } }
+  | { type: "ADD_PROJECT"; payload: Project }
+  | { type: "UPDATE_PROJECT"; payload: { id: string; patch: Partial<Project> } }
+  | { type: "DELETE_PROJECT"; payload: { id: string } }
   | { type: "ADD_TASK"; payload: Task }
   | { type: "UPDATE_TASK"; payload: { id: string; patch: Partial<Task> } }
   | { type: "DELETE_TASK"; payload: { id: string } }
@@ -23,6 +27,22 @@ type Action =
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "HYDRATE": return action.payload;
+    case "SET_ACTIVE_PROJECT": return { ...state, activeProjectId: action.payload.id };
+    case "ADD_PROJECT": return { ...state, projects: [...state.projects, action.payload] };
+    case "UPDATE_PROJECT": return {
+      ...state, projects: state.projects.map(p => p.id === action.payload.id ? { ...p, ...action.payload.patch } : p)
+    };
+    case "DELETE_PROJECT": {
+      const remaining = state.projects.filter(p => p.id !== action.payload.id);
+      const fallback = remaining[0]?.id ?? "";
+      return {
+        ...state,
+        projects: remaining,
+        activeProjectId: state.activeProjectId === action.payload.id ? fallback : state.activeProjectId,
+        tasks: state.tasks.filter(t => t.projectId !== action.payload.id),
+        sprints: state.sprints.filter(s => s.projectId !== action.payload.id),
+      };
+    }
     case "ADD_TASK": return { ...state, tasks: [action.payload, ...state.tasks] };
     case "UPDATE_TASK": return {
       ...state, tasks: state.tasks.map(t => t.id === action.payload.id ? { ...t, ...action.payload.patch } : t)
