@@ -20,6 +20,8 @@ export interface Project {
   name: string;
   description: string;
   leadIds: string[];
+  memberIds: string[]; // miembros con acceso al proyecto (además de admins)
+  color?: string;
 }
 
 export type TaskStatus = "pendiente" | "en_progreso" | "en_riesgo" | "bloqueada" | "completada";
