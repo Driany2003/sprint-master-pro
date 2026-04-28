@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useWorkOS } from "@/store/workos-store";
+import { useAuth } from "@/store/auth-store";
+import { useProjectData } from "@/store/use-project-data";
 import { ProgressBar } from "../Badges";
 import { Activity, AlertOctagon, AlertTriangle, BarChart3, CheckCircle2, Circle, CircleDot, Clock, FolderKanban, Radio, TrendingUp, Zap, Plus, ExternalLink, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,10 +13,12 @@ import { toast } from "sonner";
 
 export function DashboardView({ onCreateTask, onOpenControlTower }: { onCreateTask: () => void; onOpenControlTower: () => void }) {
   const { state, dispatch } = useWorkOS();
+  const { project, tasks: projectTasks } = useProjectData();
+  const { isAdmin, can } = useAuth();
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const tasks = state.tasks;
+  const tasks = projectTasks;
   const total = tasks.length;
   const today = startOfDay(new Date());
 
@@ -45,7 +49,7 @@ export function DashboardView({ onCreateTask, onOpenControlTower }: { onCreateTa
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard Icon={TrendingUp} label="Progreso global" value={`${globalProgress}%`} sub={`0 de ${total} tareas completadas`} tone="primary" />
-        <KpiCard Icon={FolderKanban} label="Proyectos activos" value={state.projects.length} sub={`${state.areas.length} áreas`} tone="info" />
+        <KpiCard Icon={FolderKanban} label="Proyecto activo" value={project?.name ?? "—"} sub={`${state.areas.length} áreas`} tone="info" />
         <KpiCard Icon={Clock} label="Vencidas" value={overdue.length} sub="tareas sin completar" tone="warning" />
         <KpiCard Icon={Zap} label="Urgentes activas" value={urgentActive.length} sub="sin completar" tone="destructive" />
       </div>
@@ -65,9 +69,9 @@ export function DashboardView({ onCreateTask, onOpenControlTower }: { onCreateTa
           <Row Icon={Flag} color="text-info" label="Media" value={prio.media} pct={pct(prio.media)} barTone="primary" />
           <Row Icon={Flag} color="text-muted-foreground" label="Baja" value={prio.baja} pct={pct(prio.baja)} />
         </Panel>
-        <Panel Icon={FolderKanban} title="Progreso por proyecto">
-          {state.projects.map(p => {
-            const pt = tasks.filter(t => t.projectId === p.id);
+        <Panel Icon={FolderKanban} title={isAdmin ? "Progreso por proyecto" : "Mis proyectos"}>
+          {(isAdmin ? state.projects : state.projects.filter(p => p.id === project?.id)).map(p => {
+            const pt = state.tasks.filter(t => t.projectId === p.id);
             const done = pt.filter(t => t.status === "completada").length;
             const prog = pt.length ? Math.round(pt.reduce((s, t) => s + t.progress, 0) / pt.length) : 0;
             return (
@@ -122,7 +126,7 @@ export function DashboardView({ onCreateTask, onOpenControlTower }: { onCreateTa
         </div>
         <span className="text-xs text-warning font-semibold">{overdue.length} vencida(s)</span>
         <Button variant="outline" size="sm" onClick={onOpenControlTower} className="gap-1.5"><ExternalLink className="h-3.5 w-3.5" />Abrir Control Tower</Button>
-        <Button onClick={onCreateTask} size="sm" className="gap-1.5 bg-gradient-primary text-primary-foreground hover:opacity-90"><Plus className="h-4 w-4" />Nueva tarea</Button>
+        {can("task.create") && <Button onClick={onCreateTask} size="sm" className="gap-1.5 bg-gradient-primary text-primary-foreground hover:opacity-90"><Plus className="h-4 w-4" />Nueva tarea</Button>}
       </div>
 
       <TaskDetailDialog
