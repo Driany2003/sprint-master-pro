@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNo
 import { seed } from "@/lib/seed";
 import type { State, Task, Sprint, Area, Project, TaskStatus, SprintStatus } from "@/lib/types";
 
-const KEY = "workos-state-v3";
+const KEY = "workos-state-v4";
 
 type Action =
   | { type: "HYDRATE"; payload: State }
