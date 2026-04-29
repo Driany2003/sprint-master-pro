@@ -27,12 +27,23 @@ export interface Project {
 export type TaskStatus = "pendiente" | "en_progreso" | "en_riesgo" | "bloqueada" | "completada";
 export type TaskPriority = "baja" | "media" | "alta" | "urgente";
 
+export interface Subtask {
+  id: string;
+  title: string;
+  done: boolean;
+  assigneeId?: string | null;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
   description: string;
   projectId: string;
   areaId: string;
+  /** Responsable principal (owner). Opcional para compatibilidad con datos previos. */
+  ownerId?: string | null;
+  /** Colaboradores. Mantiene compatibilidad: incluye al owner si aplica. */
   assigneeIds: string[];
   status: TaskStatus;
   priority: TaskPriority;
@@ -44,6 +55,10 @@ export interface Task {
   createdAt: string;
   completedAt?: string | null;
   blockedReason?: string;
+  /** Subtareas embebidas (checklist). */
+  subtasks?: Subtask[];
+  /** Para jerarquía futura entre tasks completas (no usado en MVP). */
+  parentTaskId?: string | null;
 }
 
 export type SprintStatus = "planificacion" | "activo" | "completado";

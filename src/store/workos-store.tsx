@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
 import { seed } from "@/lib/seed";
-import type { State, Task, Sprint, Area, Project, TaskStatus, SprintStatus } from "@/lib/types";
+import type { State, Task, Sprint, Area, Project, TaskStatus, SprintStatus, Subtask } from "@/lib/types";
 
-const KEY = "workos-state-v4";
+const KEY = "workos-state-v5";
 
 type Action =
   | { type: "HYDRATE"; payload: State }
@@ -22,7 +22,21 @@ type Action =
   | { type: "ADD_AREA"; payload: Area }
   | { type: "UPDATE_AREA"; payload: { id: string; patch: Partial<Area> } }
   | { type: "DELETE_AREA"; payload: { id: string } }
+  | { type: "ADD_SUBTASK"; payload: { taskId: string; subtask: Subtask } }
+  | { type: "UPDATE_SUBTASK"; payload: { taskId: string; subtaskId: string; patch: Partial<Subtask> } }
+  | { type: "TOGGLE_SUBTASK"; payload: { taskId: string; subtaskId: string } }
+  | { type: "DELETE_SUBTASK"; payload: { taskId: string; subtaskId: string } }
   | { type: "RESET" };
+
+/** Si la tarea tiene subtasks, el progreso se calcula automáticamente. */
+function recalcTask(task: Task): Task {
+  const subs = task.subtasks ?? [];
+  if (subs.length === 0) return task;
+  const done = subs.filter(s => s.done).length;
+  const progress = Math.floor((100 * done) / subs.length);
+  // Si todas completadas y no estaba completada, no forzamos status — solo progreso.
+  return { ...task, progress };
+}
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -45,14 +59,20 @@ function reducer(state: State, action: Action): State {
     }
     case "ADD_TASK": return { ...state, tasks: [action.payload, ...state.tasks] };
     case "UPDATE_TASK": return {
-      ...state, tasks: state.tasks.map(t => t.id === action.payload.id ? { ...t, ...action.payload.patch } : t)
+      ...state, tasks: state.tasks.map(t => t.id === action.payload.id ? recalcTask({ ...t, ...action.payload.patch }) : t)
     };
     case "DELETE_TASK": return { ...state, tasks: state.tasks.filter(t => t.id !== action.payload.id) };
     case "MOVE_TASK_STATUS": return {
       ...state, tasks: state.tasks.map(t => t.id === action.payload.id ? {
         ...t, status: action.payload.status,
-        progress: action.payload.status === "completada" ? 100 : t.progress,
+        progress: action.payload.status === "completada"
+          ? 100
+          : ((t.subtasks?.length ?? 0) > 0 ? recalcTask(t).progress : t.progress),
         completedAt: action.payload.status === "completada" ? new Date().toISOString() : null,
+        // Si se marca como completada, también marcamos todas las subtareas como hechas.
+        subtasks: action.payload.status === "completada" && t.subtasks?.length
+          ? t.subtasks.map(s => ({ ...s, done: true }))
+          : t.subtasks,
       } : t)
     };
     case "MOVE_TASK_SPRINT": return {
@@ -88,6 +108,26 @@ function reducer(state: State, action: Action): State {
         tasks: state.tasks.map(t => t.areaId === action.payload.id ? { ...t, areaId: fallback } : t),
       };
     }
+    case "ADD_SUBTASK": return {
+      ...state, tasks: state.tasks.map(t => t.id === action.payload.taskId
+        ? recalcTask({ ...t, subtasks: [...(t.subtasks ?? []), action.payload.subtask] })
+        : t)
+    };
+    case "UPDATE_SUBTASK": return {
+      ...state, tasks: state.tasks.map(t => t.id === action.payload.taskId
+        ? recalcTask({ ...t, subtasks: (t.subtasks ?? []).map(s => s.id === action.payload.subtaskId ? { ...s, ...action.payload.patch } : s) })
+        : t)
+    };
+    case "TOGGLE_SUBTASK": return {
+      ...state, tasks: state.tasks.map(t => t.id === action.payload.taskId
+        ? recalcTask({ ...t, subtasks: (t.subtasks ?? []).map(s => s.id === action.payload.subtaskId ? { ...s, done: !s.done } : s) })
+        : t)
+    };
+    case "DELETE_SUBTASK": return {
+      ...state, tasks: state.tasks.map(t => t.id === action.payload.taskId
+        ? recalcTask({ ...t, subtasks: (t.subtasks ?? []).filter(s => s.id !== action.payload.subtaskId) })
+        : t)
+    };
     case "RESET": return seed;
     default: return state;
   }
