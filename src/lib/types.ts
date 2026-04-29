@@ -59,6 +59,10 @@ export interface Task {
   subtasks?: Subtask[];
   /** Para jerarquía futura entre tasks completas (no usado en MVP). */
   parentTaskId?: string | null;
+  /** Visibilidad: si es privada, solo el creador la ve. */
+  isPrivate?: boolean;
+  /** Id del usuario que creó la tarea (para tareas privadas). */
+  createdById?: string | null;
 }
 
 export type SprintStatus = "planificacion" | "activo" | "completado";
