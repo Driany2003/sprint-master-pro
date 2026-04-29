@@ -4,9 +4,9 @@ import { useAuth } from "@/store/auth-store";
 import { useProjectData } from "@/store/use-project-data";
 import type { TaskStatus } from "@/lib/types";
 import { STATUS_LABEL } from "@/lib/types";
-import { AlertOctagon, AlertTriangle, CalendarDays, CheckCircle2, Circle, CircleDot, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertOctagon, AlertTriangle, CalendarDays, CheckCircle2, Circle, CircleDot, Crown, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
 import { AreaPill, PriorityBadge, ProgressBar } from "../Badges";
-import { AvatarStack } from "../Avatar";
+import { AvatarStack, MemberAvatar } from "../Avatar";
 import { format } from "date-fns";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { TaskDetailDialog } from "../TaskDetailDialog";
@@ -63,7 +63,10 @@ export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: Ta
                 </button>
               ) : items.map(t => {
                 const area = state.areas.find(a => a.id === t.areaId);
-                const members = t.assigneeIds.map(id => state.members.find(m => m.id === id)).filter(Boolean) as any[];
+                const owner = t.ownerId ? state.members.find(m => m.id === t.ownerId) : null;
+                const collabs = t.assigneeIds.filter(id => id !== t.ownerId).map(id => state.members.find(m => m.id === id)).filter(Boolean) as any[];
+                const subs = t.subtasks ?? [];
+                const subDone = subs.filter(s => s.done).length;
                 const canEdit = can("task.editAny") || can("task.editOwn", { task: t });
                 return (
                   <div
@@ -79,14 +82,26 @@ export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: Ta
                     </div>
                     <div className="mt-2 font-medium text-sm text-foreground leading-tight">{t.title}</div>
                     {t.description && <div className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{t.description}</div>}
+                    {subs.length > 0 && (
+                      <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5">
+                        <ListChecks className="h-3 w-3" /> {subDone}/{subs.length} subtareas
+                      </div>
+                    )}
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <ProgressBar value={t.progress} className="flex-1" />
                       <span className="text-[10px] font-semibold tabular-nums text-muted-foreground">{t.progress}%</span>
                     </div>
                     <div className="mt-2 flex items-center justify-between">
-                      {members.length ? (
-                        <AvatarStack size="xs" members={members.map(m => ({ initials: m.initials, color: m.color, name: m.name }))} />
-                      ) : <span className="text-[10px] italic text-muted-foreground">Sin asignar</span>}
+                      <div className="flex items-center gap-1.5">
+                        {owner && (
+                          <span className="relative inline-block" title={`Responsable: ${owner.name}`}>
+                            <MemberAvatar initials={owner.initials} color={owner.color} size="xs" />
+                            <Crown className="absolute -top-1 -right-1 h-2.5 w-2.5 text-warning fill-warning" />
+                          </span>
+                        )}
+                        {collabs.length > 0 && <AvatarStack size="xs" members={collabs.map(m => ({ initials: m.initials, color: m.color, name: m.name }))} />}
+                        {!owner && collabs.length === 0 && <span className="text-[10px] italic text-muted-foreground">Sin asignar</span>}
+                      </div>
                       <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
                         <CalendarDays className="h-3 w-3" />{format(new Date(t.endDate), "yyyy-MM-dd")}
                       </span>
