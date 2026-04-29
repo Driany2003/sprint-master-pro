@@ -10,7 +10,7 @@ import { AvatarStack, MemberAvatar } from "../Avatar";
 import { AreaPill, PriorityBadge, ProgressBar, StatusBadge } from "../Badges";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Activity, AlertOctagon, ArrowDown, ArrowRight, CalendarRange, CheckCircle2, ChevronDown, ChevronRight, Flag, Flame, Inbox, Pause, Pencil, Play, Plus, Sparkles, Target, Trash2, TrendingUp, Trophy, Users, Zap } from "lucide-react";
+import { Activity, AlertOctagon, ArrowDown, ArrowRight, CalendarRange, CheckCircle2, ChevronDown, ChevronRight, Crown, Flag, Flame, Inbox, ListChecks, Pause, Pencil, Play, Plus, Sparkles, Target, Trash2, TrendingUp, Trophy, Users, Zap } from "lucide-react";
 import { SprintDialog } from "./SprintDialog";
 import { TaskDialog } from "../TaskDialog";
 import { toast } from "sonner";
@@ -548,7 +548,10 @@ function Stat({ label, value, sub, tone, progress }: { label: string; value: any
 function SprintTaskCard({ task, onDragStart, onRemove, onAdd, showRemove, showAdd, onClick }: { task: Task; onDragStart: () => void; onRemove?: () => void; onAdd?: () => void; showRemove?: boolean; showAdd?: boolean; onClick?: () => void }) {
   const { state } = useWorkOS();
   const area = state.areas.find(a => a.id === task.areaId);
-  const members = task.assigneeIds.map(id => state.members.find(m => m.id === id)).filter(Boolean) as any[];
+  const owner = task.ownerId ? state.members.find(m => m.id === task.ownerId) : null;
+  const collabs = task.assigneeIds.filter(id => id !== task.ownerId).map(id => state.members.find(m => m.id === id)).filter(Boolean) as any[];
+  const subs = task.subtasks ?? [];
+  const subDone = subs.filter(s => s.done).length;
   return (
     <div draggable onDragStart={onDragStart} onClick={onClick} className="group rounded-md border bg-card p-2 shadow-xs hover:shadow-soft hover:border-primary/40 cursor-pointer transition">
       <div className="flex items-center gap-2">
@@ -559,7 +562,18 @@ function SprintTaskCard({ task, onDragStart, onRemove, onAdd, showRemove, showAd
       <div className="mt-1.5 flex items-center justify-between gap-2">
         {area && <AreaPill name={area.name} color={area.color} className="text-[10px]" />}
         <div className="flex items-center gap-1.5">
-          {members.length > 0 && <AvatarStack size="xs" members={members.map(m => ({ initials: m.initials, color: m.color, name: m.name }))} max={3} />}
+          {subs.length > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground bg-muted rounded px-1 py-0.5" title={`${subDone}/${subs.length} subtareas`}>
+              <ListChecks className="h-2.5 w-2.5" /> {subDone}/{subs.length}
+            </span>
+          )}
+          {owner && (
+            <span className="relative inline-block" title={`Responsable: ${owner.name}`}>
+              <MemberAvatar initials={owner.initials} color={owner.color} size="xs" />
+              <Crown className="absolute -top-1 -right-1 h-2.5 w-2.5 text-warning fill-warning" />
+            </span>
+          )}
+          {collabs.length > 0 && <AvatarStack size="xs" members={collabs.map(m => ({ initials: m.initials, color: m.color, name: m.name }))} max={2} />}
           {showRemove && <button onClick={(e) => { e.stopPropagation(); onRemove?.(); }} className="rounded p-0.5 hover:bg-destructive/10 text-destructive opacity-0 group-hover:opacity-100" title="Mover a backlog"><ArrowDown className="h-3 w-3" /></button>}
           {showAdd && <button onClick={(e) => { e.stopPropagation(); onAdd?.(); }} className="rounded p-0.5 hover:bg-primary/10 text-primary opacity-0 group-hover:opacity-100" title="Añadir al sprint"><ArrowRight className="h-3 w-3" /></button>}
         </div>
