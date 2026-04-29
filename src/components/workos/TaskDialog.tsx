@@ -10,7 +10,8 @@ import { useWorkOS, uid } from "@/store/workos-store";
 import type { Subtask, Task, TaskPriority, TaskStatus } from "@/lib/types";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { Crown, ListChecks, Plus, Trash2 } from "lucide-react";
+import { Crown, ListChecks, Lock, Plus, Trash2 } from "lucide-react";
+import { useAuth } from "@/store/auth-store";
 
 interface Props {
   open: boolean;
@@ -26,6 +27,7 @@ const POINTS = [1,2,3,5,8,13,21];
 
 export function TaskDialog({ open, onOpenChange, taskId, defaultSprintId, defaultStatus }: Props) {
   const { state, dispatch } = useWorkOS();
+  const { user } = useAuth();
   const editing = taskId ? state.tasks.find(t => t.id === taskId) ?? null : null;
 
   const [title, setTitle] = useState("");
@@ -42,6 +44,7 @@ export function TaskDialog({ open, onOpenChange, taskId, defaultSprintId, defaul
   const [ownerId, setOwnerId] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [newSubtask, setNewSubtask] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -54,6 +57,7 @@ export function TaskDialog({ open, onOpenChange, taskId, defaultSprintId, defaul
       setAssignees(editing.assigneeIds);
       setOwnerId(editing.ownerId ?? editing.assigneeIds[0] ?? "");
       setSubtasks(editing.subtasks ?? []);
+      setIsPrivate(!!editing.isPrivate);
     } else {
       setTitle(""); setDescription(""); setAreaId(state.areas[0]?.id ?? "");
       setStatus(defaultStatus ?? "pendiente"); setPriority("media");
@@ -64,6 +68,7 @@ export function TaskDialog({ open, onOpenChange, taskId, defaultSprintId, defaul
       setAssignees([]);
       setOwnerId(state.members[0]?.id ?? "");
       setSubtasks([]);
+      setIsPrivate(false);
     }
     setNewSubtask("");
   }, [open, editing, defaultSprintId, defaultStatus, state.areas]);
@@ -115,6 +120,7 @@ export function TaskDialog({ open, onOpenChange, taskId, defaultSprintId, defaul
         storyPoints: points, sprintId: sId,
         startDate: startISO, endDate: endISO, assigneeIds: finalAssignees,
         ownerId, subtasks,
+        isPrivate,
         completedAt: status === "completada" ? new Date().toISOString() : null,
       }}});
       toast.success("Tarea actualizada");
@@ -125,6 +131,8 @@ export function TaskDialog({ open, onOpenChange, taskId, defaultSprintId, defaul
         progress: finalProgress, storyPoints: points,
         sprintId: sId, startDate: startISO, endDate: endISO,
         subtasks,
+        isPrivate,
+        createdById: user?.id ?? null,
         createdAt: new Date().toISOString(),
         completedAt: status === "completada" ? new Date().toISOString() : null,
       };
@@ -286,6 +294,19 @@ export function TaskDialog({ open, onOpenChange, taskId, defaultSprintId, defaul
               <Button type="button" size="sm" variant="outline" onClick={addSubtask} className="gap-1 h-8"><Plus className="h-3.5 w-3.5" />Añadir</Button>
             </div>
           </div>
+
+          {/* Visibilidad */}
+          <label className="flex items-start gap-3 rounded-lg border bg-muted/20 p-3 cursor-pointer hover:bg-muted/30 transition">
+            <Checkbox checked={isPrivate} onCheckedChange={(v) => setIsPrivate(!!v)} className="mt-0.5" />
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-1.5 text-sm font-medium">
+                <Lock className="h-3.5 w-3.5 text-primary" /> Tarea privada
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Solo tú podrás verla. Los demás miembros del proyecto no la verán en ninguna vista.
+              </p>
+            </div>
+          </label>
         </div>
 
         <DialogFooter>
