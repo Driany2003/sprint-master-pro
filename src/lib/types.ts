@@ -85,6 +85,7 @@ export interface State {
   projects: Project[];
   tasks: Task[];
   sprints: Sprint[];
+  actas: Acta[];
   activeProjectId: string;
 }
 
@@ -102,3 +103,45 @@ export const PRIORITY_LABEL: Record<TaskPriority, string> = {
   alta: "Alta",
   urgente: "Urgente",
 };
+
+/* =========================================================
+ * Actas de reunión (Meeting minutes)
+ * ========================================================= */
+
+export type ActaType = "Operativa" | "Estratégica" | "Táctica" | "Otra";
+export type ActaStatus = "Abierta" | "Cerrada" | "Dada de baja";
+
+export type ActaItemStatus = "Pendiente" | "En curso" | "Completado" | "Acción";
+
+export interface ActaItem {
+  id: string;
+  areaId: string | null;
+  situacion: string;
+  /** Si la situación empieza con "##", se considera bloque (sin tarea). */
+  tarea: string;
+  responsableId: string | null;
+  /** Texto libre adicional para responsable (no obliga a un miembro). */
+  responsableTexto?: string;
+  startDate: string | null; // ISO date (yyyy-mm-dd)
+  endDate: string | null;
+  estado: ActaItemStatus;
+  /** Si ya fue convertido a tarea, guarda la referencia. */
+  convertedTaskId?: string | null;
+  /** Texto adicional libre para el acta (opcional). */
+  textoActa?: string;
+}
+
+export interface Acta {
+  id: string;
+  projectId: string;
+  title: string;
+  /** Fecha de la reunión (ISO). */
+  date: string;
+  type: ActaType;
+  status: ActaStatus;
+  /** Notas / cabecera libre del acta. */
+  notes?: string;
+  createdById: string | null;
+  createdAt: string;
+  items: ActaItem[];
+}
