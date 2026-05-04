@@ -6,6 +6,33 @@ const addDays = (n: number) => { const d = new Date(today); d.setDate(d.getDate(
 
 export const seed: State = {
   activeProjectId: "p-workos",
+  actas: [
+    {
+      id: "acta-1",
+      projectId: "p-workos",
+      title: "PRUEBA TECNICA",
+      date: iso(today),
+      type: "Operativa",
+      status: "Abierta",
+      notes: "TENEMOS LIST\nTENEMOS PROMPT",
+      createdById: "m-paola",
+      createdAt: iso(today),
+      items: [
+        { id: "ai-1", areaId: "a-ti", situacion: "fwef\nhola", tarea: "fewfwef\nwefwe", responsableId: "m-paola", responsableTexto: "Giomar Driany", startDate: iso(addDays(-8)).slice(0,10), endDate: iso(addDays(0)).slice(0,10), estado: "Acción" },
+      ],
+    },
+    {
+      id: "acta-2",
+      projectId: "p-workos",
+      title: "hola prueba 2",
+      date: iso(today),
+      type: "Estratégica",
+      status: "Abierta",
+      createdById: "m-paola",
+      createdAt: iso(today),
+      items: [],
+    },
+  ],
   projects: [
     { id: "p-workos",  name: "WorkOS",         description: "Sistema de control de tareas de Yego",     leadIds: ["m-paola"],  memberIds: ["m-paola","m-felipe","m-juan","m-mariana","m-eduardo","m-alex","m-carla","m-diego"], color: "#ef4444" },
     { id: "p-fleet",   name: "Producto Fleet", description: "Plataforma de gestión de flota vehicular.", leadIds: ["m-felipe"], memberIds: ["m-felipe","m-juan","m-mariana","m-eduardo"], color: "#0ea5e9" },

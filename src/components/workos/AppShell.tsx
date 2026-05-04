@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bell, Boxes, GanttChartSquare, KanbanSquare, LayoutDashboard, Plus, Search, Sparkles, Flame, Lock } from "lucide-react";
+import { Bell, Boxes, CalendarDays, FileText, GanttChartSquare, KanbanSquare, LayoutDashboard, Plus, Search, Sparkles, Flame, Lock } from "lucide-react";
 import { useWorkOS } from "@/store/workos-store";
 import { useAuth } from "@/store/auth-store";
 import { TaskDialog } from "./TaskDialog";
@@ -10,18 +10,22 @@ import { TimelineView } from "./views/TimelineView";
 import { BoardView } from "./views/BoardView";
 import { SprintsView } from "./views/SprintsView";
 import { DashboardView } from "./views/DashboardView";
+import { ActasView } from "./views/ActasView";
+import { CalendarView } from "./views/CalendarView";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { UserMenu } from "./UserMenu";
 import type { TaskStatus } from "@/lib/types";
 import { toast } from "sonner";
 
-type Tab = "timeline" | "portfolio" | "board" | "sprints" | "dashboard";
+type Tab = "timeline" | "portfolio" | "board" | "sprints" | "actas" | "calendar" | "dashboard";
 
 const TABS: { id: Tab; label: string; Icon: any }[] = [
   { id: "timeline",  label: "Timeline",  Icon: GanttChartSquare },
   { id: "portfolio", label: "Portfolio", Icon: Boxes },
   { id: "board",     label: "Board",     Icon: KanbanSquare },
   { id: "sprints",   label: "Sprints",   Icon: Flame },
+  { id: "actas",     label: "Actas",     Icon: FileText },
+  { id: "calendar",  label: "Calendario",Icon: CalendarDays },
   { id: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
 ];
 
@@ -103,6 +107,8 @@ export function AppShell() {
             {tab === "timeline"  && <TimelineView onCreateTask={() => setTaskDlg({ open: true, id: null })} onEditTask={(id) => setTaskDlg({ open: true, id })} />}
             {tab === "board"     && <BoardView onCreateTask={(s) => setTaskDlg({ open: true, id: null, status: s })} onEdit={(id) => setTaskDlg({ open: true, id })} />}
             {tab === "sprints"   && <SprintsView />}
+            {tab === "actas"     && <ActasView />}
+            {tab === "calendar"  && <CalendarView onOpenActas={() => setTab("actas")} />}
             {tab === "dashboard" && <DashboardView onCreateTask={() => setTaskDlg({ open: true, id: null })} onOpenControlTower={() => toast.info("Control Tower próximamente")} />}
           </div>
         )}

@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
 import { seed } from "@/lib/seed";
-import type { State, Task, Sprint, Area, Project, TaskStatus, SprintStatus, Subtask } from "@/lib/types";
+import type { State, Task, Sprint, Area, Project, TaskStatus, SprintStatus, Subtask, Acta, ActaItem } from "@/lib/types";
 
-const KEY = "workos-state-v5";
+const KEY = "workos-state-v6";
 
 type Action =
   | { type: "HYDRATE"; payload: State }
@@ -26,6 +26,13 @@ type Action =
   | { type: "UPDATE_SUBTASK"; payload: { taskId: string; subtaskId: string; patch: Partial<Subtask> } }
   | { type: "TOGGLE_SUBTASK"; payload: { taskId: string; subtaskId: string } }
   | { type: "DELETE_SUBTASK"; payload: { taskId: string; subtaskId: string } }
+  | { type: "ADD_ACTA"; payload: Acta }
+  | { type: "UPDATE_ACTA"; payload: { id: string; patch: Partial<Acta> } }
+  | { type: "DELETE_ACTA"; payload: { id: string } }
+  | { type: "ADD_ACTA_ITEM"; payload: { actaId: string; item: ActaItem } }
+  | { type: "UPDATE_ACTA_ITEM"; payload: { actaId: string; itemId: string; patch: Partial<ActaItem> } }
+  | { type: "DELETE_ACTA_ITEM"; payload: { actaId: string; itemId: string } }
+  | { type: "BULK_ADD_ACTA_ITEMS"; payload: { actaId: string; items: ActaItem[] } }
   | { type: "RESET" };
 
 /** Si la tarea tiene subtasks, el progreso se calcula automáticamente. */
@@ -127,6 +134,27 @@ function reducer(state: State, action: Action): State {
       ...state, tasks: state.tasks.map(t => t.id === action.payload.taskId
         ? recalcTask({ ...t, subtasks: (t.subtasks ?? []).filter(s => s.id !== action.payload.subtaskId) })
         : t)
+    };
+    case "ADD_ACTA": return { ...state, actas: [action.payload, ...(state.actas ?? [])] };
+    case "UPDATE_ACTA": return {
+      ...state, actas: (state.actas ?? []).map(a => a.id === action.payload.id ? { ...a, ...action.payload.patch } : a)
+    };
+    case "DELETE_ACTA": return { ...state, actas: (state.actas ?? []).filter(a => a.id !== action.payload.id) };
+    case "ADD_ACTA_ITEM": return {
+      ...state, actas: (state.actas ?? []).map(a => a.id === action.payload.actaId ? { ...a, items: [...a.items, action.payload.item] } : a)
+    };
+    case "BULK_ADD_ACTA_ITEMS": return {
+      ...state, actas: (state.actas ?? []).map(a => a.id === action.payload.actaId ? { ...a, items: [...a.items, ...action.payload.items] } : a)
+    };
+    case "UPDATE_ACTA_ITEM": return {
+      ...state, actas: (state.actas ?? []).map(a => a.id === action.payload.actaId
+        ? { ...a, items: a.items.map(i => i.id === action.payload.itemId ? { ...i, ...action.payload.patch } : i) }
+        : a)
+    };
+    case "DELETE_ACTA_ITEM": return {
+      ...state, actas: (state.actas ?? []).map(a => a.id === action.payload.actaId
+        ? { ...a, items: a.items.filter(i => i.id !== action.payload.itemId) }
+        : a)
     };
     case "RESET": return seed;
     default: return state;
