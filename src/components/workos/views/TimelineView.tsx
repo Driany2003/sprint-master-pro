@@ -41,6 +41,7 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
   const days = useMemo(() => Array.from({ length: DAYS }, (_, i) => addDays(start, i)), [start]);
 
   const tasks = projectTasks.filter(t =>
+    !t.parentTaskId &&
     (areaFilter === "all" || t.areaId === areaFilter) &&
     (prioFilter === "all" || t.priority === prioFilter)
   );
@@ -266,7 +267,7 @@ function TeamRows({ team, days, start, onSelect }: { team: any; days: Date[]; st
       <div className="col-span-full relative" style={{ gridColumn: `1 / span ${days.length + 1}` }}>
         <div className="grid grid-cols-timeline" style={{ ['--days' as any]: days.length }}>
           <div className="border-b" />
-          <div className="border-b col-span-full relative" style={{ gridColumn: `2 / span ${days.length}`, minHeight: team.tasks.length * 28 + 12 }}>
+          <div className="border-b col-span-full relative" style={{ gridColumn: `2 / span ${days.length}`, minHeight: team.tasks.length * 56 + 12, padding: "6px 0" }}>
             {team.tasks.map((t: any, idx: number) => {
               const ts = startOfDay(new Date(t.startDate));
               const te = startOfDay(new Date(t.endDate));
@@ -279,20 +280,54 @@ function TeamRows({ team, days, start, onSelect }: { team: any; days: Date[]; st
               const width = `calc(${span} * (100% / ${days.length}) - 4px)`;
               const subs = t.subtasks ?? [];
               const sd = subs.filter((s: any) => s.done).length;
+              const owner = t.ownerId ? state.members.find((m: any) => m.id === t.ownerId) : null;
               return (
                 <button
                   key={t.id}
                   onClick={() => onSelect(t.id)}
-                  className="absolute h-6 rounded-md text-[10px] text-white font-medium px-2 truncate hover:ring-2 hover:ring-offset-1 transition-all overflow-hidden flex items-center gap-1.5 shadow-soft"
-                  style={{ left, width, top: idx * 28 + 6, backgroundColor: color }}
+                  className="group absolute rounded-lg text-left overflow-hidden hover:ring-2 hover:ring-offset-1 transition-all shadow-soft border bg-card"
+                  style={{ left, width, top: idx * 56 + 6, height: 48, borderLeft: `4px solid ${color}` }}
+                  title={t.title}
                 >
-                  {subs.length > 0 && (
-                    <span className="inline-flex items-center gap-0.5 bg-black/25 rounded px-1 text-[9px] tabular-nums" title={`${sd}/${subs.length} subtareas`}>
-                      <ListChecks className="h-2.5 w-2.5" />{sd}/{subs.length}
-                    </span>
-                  )}
-                  <span className="truncate">{t.title}</span>
-                  <span className="ml-auto bg-black/20 rounded px-1 text-[9px] tabular-nums">{t.progress}%</span>
+                  {/* progress fill background */}
+                  <span
+                    aria-hidden
+                    className="absolute inset-y-0 left-0 pointer-events-none"
+                    style={{ width: `${t.progress}%`, background: `linear-gradient(90deg, ${color}22, ${color}33)` }}
+                  />
+                  <div className="relative flex flex-col h-full px-2 py-1 gap-0.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="truncate text-[11px] font-semibold text-foreground">{t.title}</span>
+                      <span
+                        className="ml-auto rounded px-1 text-[9px] font-bold tabular-nums text-white"
+                        style={{ backgroundColor: color }}
+                      >{t.progress}%</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
+                      {owner && <MemberAvatar initials={owner.initials} color={owner.color} size="xs" />}
+                      {subs.length > 0 && (
+                        <span
+                          className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 font-semibold"
+                          style={{ backgroundColor: `${color}22`, color }}
+                          title={`${sd}/${subs.length} subtareas`}
+                        >
+                          <ListChecks className="h-2.5 w-2.5" />{sd}/{subs.length}
+                        </span>
+                      )}
+                      {subs.length > 0 && (
+                        <span className="ml-auto flex items-center gap-[2px]">
+                          {subs.slice(0, 12).map((s: any) => (
+                            <span
+                              key={s.id}
+                              className="h-1.5 w-1.5 rounded-full"
+                              style={{ backgroundColor: s.done ? color : `${color}44` }}
+                            />
+                          ))}
+                          {subs.length > 12 && <span className="ml-0.5">+{subs.length - 12}</span>}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </button>
               );
             })}
