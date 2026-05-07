@@ -115,8 +115,17 @@ export function BoardView({ onCreateTask, onEdit }: { onCreateTask: (status?: Ta
                     <div className="mt-2 font-medium text-sm text-foreground leading-tight">{t.title}</div>
                     {t.description && <div className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{t.description}</div>}
                     {subs.length > 0 && (
-                      <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5">
-                        <ListChecks className="h-3 w-3" /> {subDone}/{subs.length} subtareas
+                      <div className="mt-2 rounded-md border border-primary/15 bg-primary/5 p-1.5">
+                        <div className="flex items-center justify-between text-[10px] font-semibold text-primary mb-1">
+                          <span className="inline-flex items-center gap-1"><ListChecks className="h-3 w-3" /> Subtareas</span>
+                          <span className="tabular-nums">{subDone}/{subs.length}</span>
+                        </div>
+                        <div className="flex gap-0.5">
+                          {subs.slice(0, 12).map(s => (
+                            <div key={s.id} className={`h-1.5 flex-1 rounded-sm ${s.done ? "bg-primary" : "bg-primary/15"}`} title={s.title} />
+                          ))}
+                          {subs.length > 12 && <span className="text-[9px] text-muted-foreground ml-1">+{subs.length - 12}</span>}
+                        </div>
                       </div>
                     )}
                     <div className="mt-2 flex items-center justify-between gap-2">
