@@ -41,6 +41,7 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
   const days = useMemo(() => Array.from({ length: DAYS }, (_, i) => addDays(start, i)), [start]);
 
   const tasks = projectTasks.filter(t =>
+    !t.parentTaskId &&
     (areaFilter === "all" || t.areaId === areaFilter) &&
     (prioFilter === "all" || t.priority === prioFilter)
   );
