@@ -8,8 +8,11 @@ import { ProgressBar, PriorityBadge, StatusBadge } from "../Badges";
 import { AvatarStack, MemberAvatar } from "../Avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Activity, AlertOctagon, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Trash2, Users, X, Zap, Flame, Route } from "lucide-react";
+import { Activity, AlertOctagon, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Pencil, Plus, Trash2, Users, X, Zap, Flame, Route } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { useWorkOS as _ } from "@/store/workos-store";
+import { uid } from "@/store/workos-store";
 import type { Task, TaskPriority } from "@/lib/types";
 import { Bell } from "lucide-react";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -31,6 +34,7 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [newSub, setNewSub] = useState("");
 
   const DAYS = 28;
   const start = useMemo(() => addDays(startOfDay(new Date()), offset - 2), [offset]);
@@ -59,6 +63,9 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
   const progressGlobal = totalTasks ? Math.round(tasks.reduce((s, t) => s + t.progress, 0) / totalTasks) : 0;
 
   const selected = selectedId ? state.tasks.find(t => t.id === selectedId) : null;
+  const selSubs = selected?.subtasks ?? [];
+  const selSubDone = selSubs.filter(s => s.done).length;
+  const selSubPct = selSubs.length ? Math.round((selSubDone / selSubs.length) * 100) : 0;
 
   return (
     <div className="space-y-4">
@@ -178,6 +185,35 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
             <div className="mt-4">
               <div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">Progreso</span><span className="font-semibold">{selected.progress}%</span></div>
               <ProgressBar value={selected.progress} className="mt-1" />
+            </div>
+            {/* Subtareas */}
+            <div className="mt-4 rounded-lg border-2 border-primary/15 bg-primary/5 p-2.5">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="text-[10px] uppercase tracking-wider text-primary font-bold inline-flex items-center gap-1"><ListChecks className="h-3 w-3" /> Subtareas</div>
+                {selSubs.length > 0 && <span className="text-[10px] font-bold text-primary tabular-nums">{selSubDone}/{selSubs.length} · {selSubPct}%</span>}
+              </div>
+              {selSubs.length > 0 && <div className="mb-2"><ProgressBar value={selSubPct} /></div>}
+              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                {selSubs.length === 0 && <div className="text-[11px] italic text-muted-foreground text-center py-1">Sin subtareas</div>}
+                {selSubs.map(s => (
+                  <div key={s.id} className="group flex items-center gap-1.5 rounded border bg-card px-1.5 py-1">
+                    <Checkbox checked={s.done} onCheckedChange={() => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId: selected.id, subtaskId: s.id } })} />
+                    <span className={`flex-1 text-xs ${s.done ? "line-through text-muted-foreground" : ""}`}>{s.title}</span>
+                    <button onClick={() => dispatch({ type: "DELETE_SUBTASK", payload: { taskId: selected.id, subtaskId: s.id } })} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-1">
+                <Input
+                  value={newSub}
+                  onChange={(e) => setNewSub(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && newSub.trim()) { dispatch({ type: "ADD_SUBTASK", payload: { taskId: selected.id, subtask: { id: uid("st"), title: newSub.trim(), done: false, assigneeId: null, createdAt: new Date().toISOString() } } }); setNewSub(""); } }}
+                  placeholder="+ subtarea (Enter)"
+                  className="h-7 text-xs"
+                />
+              </div>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
               <div><div className="text-muted-foreground">Inicio</div><div className="font-medium">{format(new Date(selected.startDate), "d MMM", { locale: es })}</div></div>
