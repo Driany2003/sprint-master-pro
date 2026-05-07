@@ -3,10 +3,13 @@ import { Button } from "@/components/ui/button";
 import { useWorkOS } from "@/store/workos-store";
 import { StatusBadge, PriorityBadge, AreaPill, ProgressBar } from "./Badges";
 import { MemberAvatar } from "./Avatar";
-import { CalendarRange, Crown, Flame, ListChecks, Pencil, Trash2, Users, Zap } from "lucide-react";
+import { CalendarRange, Crown, Flame, ListChecks, Pencil, Plus, Trash2, Users, X, Zap } from "lucide-react";
 import { format, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { uid } from "@/store/workos-store";
 
 interface Props {
   open: boolean;
@@ -18,6 +21,7 @@ interface Props {
 
 export function TaskDetailDialog({ open, onOpenChange, taskId, onEdit, onDelete }: Props) {
   const { state, dispatch } = useWorkOS();
+  const [newSub, setNewSub] = useState("");
   const task = taskId ? state.tasks.find(t => t.id === taskId) : null;
   if (!task) return null;
   const area = state.areas.find(a => a.id === task.areaId);
@@ -29,7 +33,15 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onEdit, onDelete 
     .filter(Boolean) as any[];
   const subtasks = task.subtasks ?? [];
   const subDone = subtasks.filter(s => s.done).length;
+  const subPct = subtasks.length ? Math.round((subDone / subtasks.length) * 100) : 0;
   const days = differenceInCalendarDays(new Date(task.endDate), new Date(task.startDate)) + 1;
+
+  function addSub() {
+    const title = newSub.trim();
+    if (!title) return;
+    dispatch({ type: "ADD_SUBTASK", payload: { taskId: task!.id, subtask: { id: uid("st"), title, done: false, assigneeId: null, createdAt: new Date().toISOString() } } });
+    setNewSub("");
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -100,21 +112,45 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onEdit, onDelete 
           </div>
 
           {/* Subtareas */}
-          {subtasks.length > 0 && (
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 inline-flex items-center gap-1.5">
-                <ListChecks className="h-3 w-3 text-primary" /> Subtareas <span className="text-foreground font-bold tabular-nums">{subDone}/{subtasks.length}</span>
+          <div className="rounded-xl border-2 border-primary/15 bg-gradient-to-br from-primary/5 to-transparent p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[11px] uppercase tracking-wider text-primary font-bold inline-flex items-center gap-1.5">
+                <ListChecks className="h-3.5 w-3.5" /> Subtareas
+                {subtasks.length > 0 && <span className="ml-1 rounded-full bg-primary/15 text-primary px-2 py-0.5 text-[10px] tabular-nums">{subDone}/{subtasks.length}</span>}
               </div>
-              <div className="space-y-1">
-                {subtasks.map(s => (
-                  <label key={s.id} className="flex items-center gap-2 rounded-md border bg-card px-2 py-1.5 cursor-pointer hover:bg-muted/40 transition">
-                    <Checkbox checked={s.done} onCheckedChange={() => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId: task.id, subtaskId: s.id } })} />
-                    <span className={`text-sm flex-1 ${s.done ? "line-through text-muted-foreground" : ""}`}>{s.title}</span>
-                  </label>
-                ))}
-              </div>
+              {subtasks.length > 0 && <span className="text-[11px] font-bold tabular-nums text-primary">{subPct}%</span>}
             </div>
-          )}
+            {subtasks.length > 0 && (
+              <div className="mb-2"><ProgressBar value={subPct} /></div>
+            )}
+            <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+              {subtasks.length === 0 && <div className="text-xs italic text-muted-foreground py-2 text-center">Aún no hay subtareas. Añade la primera abajo.</div>}
+              {subtasks.map((s, i) => (
+                <div key={s.id} className="group flex items-center gap-2 rounded-md border bg-card px-2 py-1.5 hover:border-primary/40 hover:shadow-xs transition">
+                  <span className="text-[10px] font-mono text-muted-foreground w-5 text-center tabular-nums">{String(i+1).padStart(2,"0")}</span>
+                  <Checkbox checked={s.done} onCheckedChange={() => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId: task.id, subtaskId: s.id } })} />
+                  <input
+                    defaultValue={s.title}
+                    onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== s.title) dispatch({ type: "UPDATE_SUBTASK", payload: { taskId: task.id, subtaskId: s.id, patch: { title: v } } }); }}
+                    className={`flex-1 bg-transparent text-sm outline-none focus:ring-1 focus:ring-primary rounded px-1 ${s.done ? "line-through text-muted-foreground" : ""}`}
+                  />
+                  <button onClick={() => dispatch({ type: "DELETE_SUBTASK", payload: { taskId: task.id, subtaskId: s.id } })} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition" title="Eliminar">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <Input
+                value={newSub}
+                onChange={(e) => setNewSub(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSub(); } }}
+                placeholder="Añadir subtarea y pulsa Enter…"
+                className="h-8 text-sm"
+              />
+              <Button size="sm" onClick={addSub} disabled={!newSub.trim()} className="gap-1 bg-gradient-primary text-primary-foreground hover:opacity-90 h-8"><Plus className="h-3.5 w-3.5" />Añadir</Button>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 pt-2 border-t">
