@@ -277,6 +277,8 @@ function TeamRows({ team, days, start, onSelect }: { team: any; days: Date[]; st
               const color = PRIO_COLOR[t.priority as TaskPriority];
               const left = `calc(${dayStart} * (100% / ${days.length}))`;
               const width = `calc(${span} * (100% / ${days.length}) - 4px)`;
+              const subs = t.subtasks ?? [];
+              const sd = subs.filter((s: any) => s.done).length;
               return (
                 <button
                   key={t.id}
@@ -284,6 +286,11 @@ function TeamRows({ team, days, start, onSelect }: { team: any; days: Date[]; st
                   className="absolute h-6 rounded-md text-[10px] text-white font-medium px-2 truncate hover:ring-2 hover:ring-offset-1 transition-all overflow-hidden flex items-center gap-1.5 shadow-soft"
                   style={{ left, width, top: idx * 28 + 6, backgroundColor: color }}
                 >
+                  {subs.length > 0 && (
+                    <span className="inline-flex items-center gap-0.5 bg-black/25 rounded px-1 text-[9px] tabular-nums" title={`${sd}/${subs.length} subtareas`}>
+                      <ListChecks className="h-2.5 w-2.5" />{sd}/{subs.length}
+                    </span>
+                  )}
                   <span className="truncate">{t.title}</span>
                   <span className="ml-auto bg-black/20 rounded px-1 text-[9px] tabular-nums">{t.progress}%</span>
                 </button>
