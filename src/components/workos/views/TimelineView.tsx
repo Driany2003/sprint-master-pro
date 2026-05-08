@@ -288,16 +288,21 @@ function TeamRows({ team, days, start, onSelect, onEditSubtask }: { team: any; d
     onCommit: (newStartISO: string, newEndISO: string) => void,
   ) {
     e.stopPropagation(); e.preventDefault();
-    const bar = e.currentTarget as HTMLElement;
-    const container = bar.parentElement as HTMLElement;
+    const target = e.currentTarget as HTMLElement;
+    // Cuando arrastramos por un handle de resize, el bar real es el padre.
+    const bar = (mode === "move" ? target : (target.parentElement as HTMLElement));
+    const container = bar.closest("[data-bars-track]") as HTMLElement || (bar.parentElement as HTMLElement);
     const rect = container.getBoundingClientRect();
     const dayPx = rect.width / days.length;
     const startX = e.clientX;
     const origStart = startOfDay(new Date(item.startDate));
     const origEnd = startOfDay(new Date(item.endDate));
-    bar.setPointerCapture(e.pointerId);
+    target.setPointerCapture(e.pointerId);
     bar.style.cursor = mode === "move" ? "grabbing" : "ew-resize";
     bar.style.zIndex = "30";
+    const origRect = bar.getBoundingClientRect();
+    const origLeftPx = origRect.left - rect.left;
+    const origWidthPx = origRect.width;
 
     let dDays = 0;
     const move = (ev: PointerEvent) => {
@@ -306,22 +311,22 @@ function TeamRows({ team, days, start, onSelect, onEditSubtask }: { team: any; d
       if (mode === "move") {
         bar.style.transform = `translateX(${dDays * dayPx}px)`;
       } else if (mode === "right") {
-        const newW = Math.max(dayPx - 4, parseFloat(bar.dataset.origW || "0") + dDays * dayPx);
+        const newW = Math.max(dayPx - 4, origWidthPx + dDays * dayPx);
         bar.style.width = `${newW}px`;
       } else {
-        const newL = parseFloat(bar.dataset.origL || "0") + dDays * dayPx;
-        const newW = Math.max(dayPx - 4, parseFloat(bar.dataset.origW || "0") - dDays * dayPx);
+        const newL = origLeftPx + dDays * dayPx;
+        const newW = Math.max(dayPx - 4, origWidthPx - dDays * dayPx);
         bar.style.left = `${newL}px`;
         bar.style.width = `${newW}px`;
       }
     };
     const up = () => {
-      bar.releasePointerCapture(e.pointerId);
+      try { target.releasePointerCapture(e.pointerId); } catch {}
       bar.style.removeProperty("transform");
       bar.style.removeProperty("cursor");
       bar.style.removeProperty("z-index");
-      bar.removeEventListener("pointermove", move as any);
-      bar.removeEventListener("pointerup", up);
+      target.removeEventListener("pointermove", move as any);
+      target.removeEventListener("pointerup", up);
       if (dDays === 0) return;
       let ns = origStart, ne = origEnd;
       if (mode === "move") { ns = addDays(origStart, dDays); ne = addDays(origEnd, dDays); }
@@ -329,8 +334,8 @@ function TeamRows({ team, days, start, onSelect, onEditSubtask }: { team: any; d
       else { ns = addDays(origStart, dDays); if (ns > ne) ns = ne; }
       onCommit(ns.toISOString(), ne.toISOString());
     };
-    bar.addEventListener("pointermove", move as any);
-    bar.addEventListener("pointerup", up);
+    target.addEventListener("pointermove", move as any);
+    target.addEventListener("pointerup", up);
   }
 
   return (
@@ -359,7 +364,7 @@ function TeamRows({ team, days, start, onSelect, onEditSubtask }: { team: any; d
       <div className="col-span-full relative" style={{ gridColumn: `1 / span ${days.length + 1}` }}>
         <div className="grid grid-cols-timeline" style={{ ['--days' as any]: days.length }}>
           <div className="border-b" />
-          <div className="border-b col-span-full relative" style={{ gridColumn: `2 / span ${days.length}`, minHeight: totalH, padding: "6px 0" }}>
+          <div data-bars-track className="border-b col-span-full relative" style={{ gridColumn: `2 / span ${days.length}`, minHeight: totalH, padding: "6px 0" }}>
             {(() => {
               let yCursor = 6;
               const nodes: React.ReactNode[] = [];
