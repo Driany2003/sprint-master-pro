@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useWorkOS, uid } from "@/store/workos-store";
-import type { SubChecklistItem, Subtask } from "@/lib/types";
+import type { SubChecklistItem, Subtask, TaskStatus } from "@/lib/types";
+import { STATUS_LABEL } from "@/lib/types";
 import { Calendar, Crown, ListChecks, Plus, Target, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,6 +31,9 @@ export function SubtaskDialog({ open, onOpenChange, taskId, subtaskId }: Props) 
   const [projectId, setProjectId] = useState<string>("");
   const [assigneeId, setAssigneeId] = useState<string>("");
   const [dueDate, setDueDate] = useState<string>("");
+  const [status, setStatus] = useState<TaskStatus>("pendiente");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [checklist, setChecklist] = useState<SubChecklistItem[]>([]);
   const [newItem, setNewItem] = useState("");
 
@@ -43,6 +47,9 @@ export function SubtaskDialog({ open, onOpenChange, taskId, subtaskId }: Props) 
       setProjectId(editing.projectId ?? task.projectId);
       setAssigneeId(editing.assigneeId ?? task.ownerId ?? "");
       setDueDate(editing.dueDate ? editing.dueDate.slice(0,10) : (task.endDate?.slice(0,10) ?? ""));
+      setStatus(editing.status ?? (editing.done ? "completada" : "pendiente"));
+      setStartDate((editing.startDate ?? task.startDate)?.slice(0,10) ?? "");
+      setEndDate((editing.endDate ?? editing.dueDate ?? task.endDate)?.slice(0,10) ?? "");
       setChecklist(editing.checklist ?? []);
     } else {
       setTitle("");
@@ -52,6 +59,9 @@ export function SubtaskDialog({ open, onOpenChange, taskId, subtaskId }: Props) 
       setProjectId(task.projectId);
       setAssigneeId(task.ownerId ?? "");
       setDueDate(task.endDate?.slice(0,10) ?? "");
+      setStatus("pendiente");
+      setStartDate(task.startDate?.slice(0,10) ?? "");
+      setEndDate(task.endDate?.slice(0,10) ?? "");
       setChecklist([]);
     }
     setNewItem("");
@@ -74,6 +84,10 @@ export function SubtaskDialog({ open, onOpenChange, taskId, subtaskId }: Props) 
       areaId, projectId,
       assigneeId: assigneeId || null,
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+      status,
+      startDate: startDate ? new Date(startDate).toISOString() : null,
+      endDate: endDate ? new Date(endDate).toISOString() : null,
+      done: status === "completada",
       checklist,
     };
     if (editing) {
