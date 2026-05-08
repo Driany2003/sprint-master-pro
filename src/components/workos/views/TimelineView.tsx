@@ -10,13 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Activity, AlertOctagon, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Pencil, Plus, Trash2, Users, X, Zap, Flame, Route } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { useWorkOS as _ } from "@/store/workos-store";
-import { uid } from "@/store/workos-store";
 import type { Task, TaskPriority } from "@/lib/types";
 import { Bell } from "lucide-react";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { toast } from "sonner";
+import { SubtaskDialog } from "../SubtaskDialog";
 
 const PRIO_COLOR: Record<TaskPriority, string> = {
   urgente: "hsl(var(--prio-urgent))",
@@ -34,7 +33,7 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [newSub, setNewSub] = useState("");
+  const [subDlg, setSubDlg] = useState<{ open: boolean; subtaskId: string | null }>({ open: false, subtaskId: null });
 
   const DAYS = 28;
   const start = useMemo(() => addDays(startOfDay(new Date()), offset - 2), [offset]);
@@ -199,21 +198,31 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
                 {selSubs.map(s => (
                   <div key={s.id} className="group flex items-center gap-1.5 rounded border bg-card px-1.5 py-1">
                     <Checkbox checked={s.done} onCheckedChange={() => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId: selected.id, subtaskId: s.id } })} />
-                    <span className={`flex-1 text-xs ${s.done ? "line-through text-muted-foreground" : ""}`}>{s.title}</span>
+                    <button
+                      onClick={() => setSubDlg({ open: true, subtaskId: s.id })}
+                      className={`flex-1 text-left text-xs hover:text-primary transition ${s.done ? "line-through text-muted-foreground" : ""}`}
+                      title="Editar subtarea"
+                    >
+                      {s.title}
+                      {s.checklist && s.checklist.length > 0 && (
+                        <span className="ml-1 text-[9px] tabular-nums text-muted-foreground">
+                          · {s.checklist.filter(c=>c.done).length}/{s.checklist.length}
+                        </span>
+                      )}
+                    </button>
+                    <button onClick={() => setSubDlg({ open: true, subtaskId: s.id })} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary" title="Editar">
+                      <Pencil className="h-3 w-3" />
+                    </button>
                     <button onClick={() => dispatch({ type: "DELETE_SUBTASK", payload: { taskId: selected.id, subtaskId: s.id } })} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
                 ))}
               </div>
-              <div className="mt-2 flex gap-1">
-                <Input
-                  value={newSub}
-                  onChange={(e) => setNewSub(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && newSub.trim()) { dispatch({ type: "ADD_SUBTASK", payload: { taskId: selected.id, subtask: { id: uid("st"), title: newSub.trim(), done: false, assigneeId: null, createdAt: new Date().toISOString() } } }); setNewSub(""); } }}
-                  placeholder="+ subtarea (Enter)"
-                  className="h-7 text-xs"
-                />
+              <div className="mt-2">
+                <Button size="sm" variant="outline" className="w-full h-7 gap-1 text-xs" onClick={() => setSubDlg({ open: true, subtaskId: null })}>
+                  <Plus className="h-3 w-3" /> Nueva subtarea
+                </Button>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
@@ -234,6 +243,12 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
           if (selected) { dispatch({ type: "DELETE_TASK", payload: { id: selected.id } }); toast.success("Tarea eliminada"); setSelectedId(null); }
           setConfirmDelete(false);
         }}
+      />
+      <SubtaskDialog
+        open={subDlg.open}
+        onOpenChange={(o) => setSubDlg(s => ({ ...s, open: o }))}
+        taskId={selectedId}
+        subtaskId={subDlg.subtaskId}
       />
     </div>
   );
