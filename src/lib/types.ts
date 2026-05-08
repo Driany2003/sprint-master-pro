@@ -33,6 +33,24 @@ export interface Subtask {
   done: boolean;
   assigneeId?: string | null;
   createdAt: string;
+  /** Detalle libre de la subtarea. */
+  description?: string;
+  /** Objetivo / outcome esperado. */
+  objective?: string;
+  /** Área (hereda de la tarea padre por defecto). */
+  areaId?: string | null;
+  /** Proyecto (hereda de la tarea padre por defecto). */
+  projectId?: string | null;
+  /** Fecha objetivo. */
+  dueDate?: string | null;
+  /** Checklist interno de pasos concretos. */
+  checklist?: SubChecklistItem[];
+}
+
+export interface SubChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
 }
 
 export interface Task {
