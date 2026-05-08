@@ -228,6 +228,25 @@ export function SubtaskDialog({ open, onOpenChange, taskId, subtaskId }: Props) 
               <Label className="text-xs inline-flex items-center gap-1.5"><Calendar className="h-3 w-3" /> Fecha objetivo</Label>
               <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-9" />
             </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Estado</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(STATUS_LABEL) as TaskStatus[]).map(s => (
+                    <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs inline-flex items-center gap-1.5"><Calendar className="h-3 w-3" /> Inicio en Timeline</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs inline-flex items-center gap-1.5"><Calendar className="h-3 w-3" /> Fin en Timeline</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9" />
+            </div>
           </div>
         </div>
 
