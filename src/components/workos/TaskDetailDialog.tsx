@@ -7,9 +7,8 @@ import { CalendarRange, Crown, Flame, ListChecks, Pencil, Plus, Trash2, Users, X
 import { format, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { useState } from "react";
-import { uid } from "@/store/workos-store";
+import { SubtaskDialog } from "./SubtaskDialog";
 
 interface Props {
   open: boolean;
@@ -21,7 +20,7 @@ interface Props {
 
 export function TaskDetailDialog({ open, onOpenChange, taskId, onEdit, onDelete }: Props) {
   const { state, dispatch } = useWorkOS();
-  const [newSub, setNewSub] = useState("");
+  const [subDlg, setSubDlg] = useState<{ open: boolean; subtaskId: string | null }>({ open: false, subtaskId: null });
   const task = taskId ? state.tasks.find(t => t.id === taskId) : null;
   if (!task) return null;
   const area = state.areas.find(a => a.id === task.areaId);
@@ -35,13 +34,6 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onEdit, onDelete 
   const subDone = subtasks.filter(s => s.done).length;
   const subPct = subtasks.length ? Math.round((subDone / subtasks.length) * 100) : 0;
   const days = differenceInCalendarDays(new Date(task.endDate), new Date(task.startDate)) + 1;
-
-  function addSub() {
-    const title = newSub.trim();
-    if (!title) return;
-    dispatch({ type: "ADD_SUBTASK", payload: { taskId: task!.id, subtask: { id: uid("st"), title, done: false, assigneeId: null, createdAt: new Date().toISOString() } } });
-    setNewSub("");
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -129,26 +121,32 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onEdit, onDelete 
                 <div key={s.id} className="group flex items-center gap-2 rounded-md border bg-card px-2 py-1.5 hover:border-primary/40 hover:shadow-xs transition">
                   <span className="text-[10px] font-mono text-muted-foreground w-5 text-center tabular-nums">{String(i+1).padStart(2,"0")}</span>
                   <Checkbox checked={s.done} onCheckedChange={() => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId: task.id, subtaskId: s.id } })} />
-                  <input
-                    defaultValue={s.title}
-                    onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== s.title) dispatch({ type: "UPDATE_SUBTASK", payload: { taskId: task.id, subtaskId: s.id, patch: { title: v } } }); }}
-                    className={`flex-1 bg-transparent text-sm outline-none focus:ring-1 focus:ring-primary rounded px-1 ${s.done ? "line-through text-muted-foreground" : ""}`}
-                  />
+                  <button
+                    onClick={() => setSubDlg({ open: true, subtaskId: s.id })}
+                    className={`flex-1 text-left bg-transparent text-sm outline-none rounded px-1 hover:text-primary transition ${s.done ? "line-through text-muted-foreground" : ""}`}
+                    title="Editar subtarea"
+                  >
+                    {s.title}
+                    <span className="ml-2 inline-flex items-center gap-2 text-[10px] text-muted-foreground">
+                      {s.objective && <span className="rounded bg-primary/10 text-primary px-1 py-0.5">obj</span>}
+                      {s.checklist && s.checklist.length > 0 && (
+                        <span className="tabular-nums">{s.checklist.filter(c=>c.done).length}/{s.checklist.length}</span>
+                      )}
+                    </span>
+                  </button>
+                  <button onClick={() => setSubDlg({ open: true, subtaskId: s.id })} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition" title="Editar">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
                   <button onClick={() => dispatch({ type: "DELETE_SUBTASK", payload: { taskId: task.id, subtaskId: s.id } })} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition" title="Eliminar">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ))}
             </div>
-            <div className="mt-2 flex items-center gap-2">
-              <Input
-                value={newSub}
-                onChange={(e) => setNewSub(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSub(); } }}
-                placeholder="Añadir subtarea y pulsa Enter…"
-                className="h-8 text-sm"
-              />
-              <Button size="sm" onClick={addSub} disabled={!newSub.trim()} className="gap-1 bg-gradient-primary text-primary-foreground hover:opacity-90 h-8"><Plus className="h-3.5 w-3.5" />Añadir</Button>
+            <div className="mt-2">
+              <Button size="sm" onClick={() => setSubDlg({ open: true, subtaskId: null })} className="w-full gap-1 bg-gradient-primary text-primary-foreground hover:opacity-90 h-8">
+                <Plus className="h-3.5 w-3.5" />Nueva subtarea
+              </Button>
             </div>
           </div>
         </div>
@@ -157,6 +155,7 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onEdit, onDelete 
           <Button variant="outline" size="sm" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => onDelete(task.id)}><Trash2 className="h-3.5 w-3.5" />Eliminar</Button>
           <Button size="sm" onClick={() => onEdit(task.id)} className="gap-1.5 bg-gradient-primary text-primary-foreground hover:opacity-90"><Pencil className="h-3.5 w-3.5" />Editar</Button>
         </div>
+        <SubtaskDialog open={subDlg.open} onOpenChange={(o) => setSubDlg(s => ({ ...s, open: o }))} taskId={task.id} subtaskId={subDlg.subtaskId} />
       </DialogContent>
     </Dialog>
   );
