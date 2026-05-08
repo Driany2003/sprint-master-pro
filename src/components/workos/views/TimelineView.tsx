@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Activity, AlertOctagon, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Pencil, Plus, Trash2, Users, X, Zap, Flame, Route } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useWorkOS as _ } from "@/store/workos-store";
-import type { Task, TaskPriority } from "@/lib/types";
+import type { Task, TaskPriority, TaskStatus, Subtask } from "@/lib/types";
 import { Bell } from "lucide-react";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { toast } from "sonner";
@@ -22,6 +22,14 @@ const PRIO_COLOR: Record<TaskPriority, string> = {
   alta:    "hsl(var(--prio-high))",
   media:   "hsl(var(--prio-medium))",
   baja:    "hsl(var(--prio-low))",
+};
+
+const STATUS_COLOR: Record<TaskStatus, string> = {
+  pendiente:   "hsl(var(--status-pending))",
+  en_progreso: "hsl(var(--info))",
+  en_riesgo:   "hsl(var(--status-risk))",
+  bloqueada:   "hsl(var(--destructive))",
+  completada:  "hsl(var(--success))",
 };
 
 export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () => void; onEditTask: (id: string) => void }) {
