@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Activity, AlertOctagon, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Pencil, Plus, Trash2, Users, X, Zap, Flame, Route } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useWorkOS as _ } from "@/store/workos-store";
-import type { Task, TaskPriority } from "@/lib/types";
+import type { Task, TaskPriority, TaskStatus, Subtask } from "@/lib/types";
 import { Bell } from "lucide-react";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { toast } from "sonner";
@@ -22,6 +22,14 @@ const PRIO_COLOR: Record<TaskPriority, string> = {
   alta:    "hsl(var(--prio-high))",
   media:   "hsl(var(--prio-medium))",
   baja:    "hsl(var(--prio-low))",
+};
+
+const STATUS_COLOR: Record<TaskStatus, string> = {
+  pendiente:   "hsl(var(--status-pending))",
+  en_progreso: "hsl(var(--info))",
+  en_riesgo:   "hsl(var(--status-risk))",
+  bloqueada:   "hsl(var(--destructive))",
+  completada:  "hsl(var(--success))",
 };
 
 export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () => void; onEditTask: (id: string) => void }) {
@@ -139,7 +147,14 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
               })}
 
               {teams.map(team => (
-                <TeamRows key={team.area.id} team={team} days={days} start={start} onSelect={setSelectedId} />
+                <TeamRows
+                  key={team.area.id}
+                  team={team}
+                  days={days}
+                  start={start}
+                  onSelect={setSelectedId}
+                  onEditSubtask={(taskId, sid) => { setSelectedId(taskId); setSubDlg({ open: true, subtaskId: sid }); }}
+                />
               ))}
             </div>
           </div>
@@ -254,8 +269,75 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
   );
 }
 
-function TeamRows({ team, days, start, onSelect }: { team: any; days: Date[]; start: Date; onSelect: (id: string) => void }) {
-  const { state } = useWorkOS();
+function TeamRows({ team, days, start, onSelect, onEditSubtask }: { team: any; days: Date[]; start: Date; onSelect: (id: string) => void; onEditSubtask: (taskId: string, subtaskId: string) => void }) {
+  const { state, dispatch } = useWorkOS();
+
+  // Calcula altura de la fila por tarea (parent + subtareas).
+  const PARENT_H = 56;
+  const SUB_H = 26;
+  const tasksWithHeights = team.tasks.map((t: any) => {
+    const subs = (t.subtasks ?? []) as Subtask[];
+    return { task: t, subs, height: PARENT_H + subs.length * SUB_H };
+  });
+  const totalH = tasksWithHeights.reduce((s: number, x: any) => s + x.height, 0) + 12;
+
+  function startDrag(
+    e: React.PointerEvent<HTMLElement>,
+    mode: "move" | "left" | "right",
+    item: { startDate: string; endDate: string },
+    onCommit: (newStartISO: string, newEndISO: string) => void,
+  ) {
+    e.stopPropagation(); e.preventDefault();
+    const target = e.currentTarget as HTMLElement;
+    // Cuando arrastramos por un handle de resize, el bar real es el padre.
+    const bar = (mode === "move" ? target : (target.parentElement as HTMLElement));
+    const container = bar.closest("[data-bars-track]") as HTMLElement || (bar.parentElement as HTMLElement);
+    const rect = container.getBoundingClientRect();
+    const dayPx = rect.width / days.length;
+    const startX = e.clientX;
+    const origStart = startOfDay(new Date(item.startDate));
+    const origEnd = startOfDay(new Date(item.endDate));
+    target.setPointerCapture(e.pointerId);
+    bar.style.cursor = mode === "move" ? "grabbing" : "ew-resize";
+    bar.style.zIndex = "30";
+    const origRect = bar.getBoundingClientRect();
+    const origLeftPx = origRect.left - rect.left;
+    const origWidthPx = origRect.width;
+
+    let dDays = 0;
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX;
+      dDays = Math.round(dx / dayPx);
+      if (mode === "move") {
+        bar.style.transform = `translateX(${dDays * dayPx}px)`;
+      } else if (mode === "right") {
+        const newW = Math.max(dayPx - 4, origWidthPx + dDays * dayPx);
+        bar.style.width = `${newW}px`;
+      } else {
+        const newL = origLeftPx + dDays * dayPx;
+        const newW = Math.max(dayPx - 4, origWidthPx - dDays * dayPx);
+        bar.style.left = `${newL}px`;
+        bar.style.width = `${newW}px`;
+      }
+    };
+    const up = () => {
+      try { target.releasePointerCapture(e.pointerId); } catch {}
+      bar.style.removeProperty("transform");
+      bar.style.removeProperty("cursor");
+      bar.style.removeProperty("z-index");
+      target.removeEventListener("pointermove", move as any);
+      target.removeEventListener("pointerup", up);
+      if (dDays === 0) return;
+      let ns = origStart, ne = origEnd;
+      if (mode === "move") { ns = addDays(origStart, dDays); ne = addDays(origEnd, dDays); }
+      else if (mode === "right") { ne = addDays(origEnd, dDays); if (ne < ns) ne = ns; }
+      else { ns = addDays(origStart, dDays); if (ns > ne) ns = ne; }
+      onCommit(ns.toISOString(), ne.toISOString());
+    };
+    target.addEventListener("pointermove", move as any);
+    target.addEventListener("pointerup", up);
+  }
+
   return (
     <>
       <div className="border-b border-l-0 px-3 py-3 bg-card">
@@ -282,70 +364,110 @@ function TeamRows({ team, days, start, onSelect }: { team: any; days: Date[]; st
       <div className="col-span-full relative" style={{ gridColumn: `1 / span ${days.length + 1}` }}>
         <div className="grid grid-cols-timeline" style={{ ['--days' as any]: days.length }}>
           <div className="border-b" />
-          <div className="border-b col-span-full relative" style={{ gridColumn: `2 / span ${days.length}`, minHeight: team.tasks.length * 56 + 12, padding: "6px 0" }}>
-            {team.tasks.map((t: any, idx: number) => {
-              const ts = startOfDay(new Date(t.startDate));
-              const te = startOfDay(new Date(t.endDate));
-              const dayStart = Math.max(0, differenceInCalendarDays(ts, start));
-              const dayEnd = Math.min(days.length - 1, differenceInCalendarDays(te, start));
-              if (dayEnd < 0 || dayStart > days.length - 1) return null;
-              const span = dayEnd - dayStart + 1;
-              const color = PRIO_COLOR[t.priority as TaskPriority];
-              const left = `calc(${dayStart} * (100% / ${days.length}))`;
-              const width = `calc(${span} * (100% / ${days.length}) - 4px)`;
-              const subs = t.subtasks ?? [];
-              const sd = subs.filter((s: any) => s.done).length;
-              const owner = t.ownerId ? state.members.find((m: any) => m.id === t.ownerId) : null;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => onSelect(t.id)}
-                  className="group absolute rounded-lg text-left overflow-hidden hover:ring-2 hover:ring-offset-1 transition-all shadow-soft border bg-card"
-                  style={{ left, width, top: idx * 56 + 6, height: 48, borderLeft: `4px solid ${color}` }}
-                  title={t.title}
-                >
-                  {/* progress fill background */}
-                  <span
-                    aria-hidden
-                    className="absolute inset-y-0 left-0 pointer-events-none"
-                    style={{ width: `${t.progress}%`, background: `linear-gradient(90deg, ${color}22, ${color}33)` }}
-                  />
-                  <div className="relative flex flex-col h-full px-2 py-1 gap-0.5">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="truncate text-[11px] font-semibold text-foreground">{t.title}</span>
-                      <span
-                        className="ml-auto rounded px-1 text-[9px] font-bold tabular-nums text-white"
-                        style={{ backgroundColor: color }}
-                      >{t.progress}%</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
-                      {owner && <MemberAvatar initials={owner.initials} color={owner.color} size="xs" />}
-                      {subs.length > 0 && (
-                        <span
-                          className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 font-semibold"
-                          style={{ backgroundColor: `${color}22`, color }}
-                          title={`${sd}/${subs.length} subtareas`}
-                        >
-                          <ListChecks className="h-2.5 w-2.5" />{sd}/{subs.length}
-                        </span>
-                      )}
-                      {subs.length > 0 && (
-                        <span className="ml-auto flex items-center gap-[2px]">
-                          {subs.slice(0, 12).map((s: any) => (
-                            <span
-                              key={s.id}
-                              className="h-1.5 w-1.5 rounded-full"
-                              style={{ backgroundColor: s.done ? color : `${color}44` }}
-                            />
-                          ))}
-                          {subs.length > 12 && <span className="ml-0.5">+{subs.length - 12}</span>}
-                        </span>
-                      )}
+          <div data-bars-track className="border-b col-span-full relative" style={{ gridColumn: `2 / span ${days.length}`, minHeight: totalH, padding: "6px 0" }}>
+            {(() => {
+              let yCursor = 6;
+              const nodes: React.ReactNode[] = [];
+              tasksWithHeights.forEach(({ task: t, subs }: any) => {
+                const ts = startOfDay(new Date(t.startDate));
+                const te = startOfDay(new Date(t.endDate));
+                const dayStart = Math.max(0, differenceInCalendarDays(ts, start));
+                const dayEnd = Math.min(days.length - 1, differenceInCalendarDays(te, start));
+                const inView = !(dayEnd < 0 || dayStart > days.length - 1);
+                const span = dayEnd - dayStart + 1;
+                const color = PRIO_COLOR[t.priority as TaskPriority];
+                const dayPct = 100 / days.length;
+                const owner = t.ownerId ? state.members.find((m: any) => m.id === t.ownerId) : null;
+                const sd = subs.filter((s: any) => s.done).length;
+                const parentTop = yCursor;
+                if (inView) nodes.push(
+                  <div
+                    key={t.id}
+                    onPointerDown={(e) => startDrag(e, "move", t, (ns, ne) =>
+                      dispatch({ type: "UPDATE_TASK", payload: { id: t.id, patch: { startDate: ns, endDate: ne } } })
+                    )}
+                    onClick={() => onSelect(t.id)}
+                    data-orig-l={`${dayStart * (100 / days.length)}%`}
+                    data-orig-w={`${span * (100 / days.length)}%`}
+                    className="group absolute rounded-lg text-left overflow-hidden hover:ring-2 hover:ring-primary/40 transition-shadow shadow-soft border bg-card cursor-grab select-none"
+                    style={{ left: `${dayStart * dayPct}%`, width: `calc(${span * dayPct}% - 4px)`, top: parentTop, height: 48, borderLeft: `4px solid ${color}` }}
+                    title={`${t.title} — arrastra para mover`}
+                  >
+                    <span aria-hidden className="absolute inset-y-0 left-0 pointer-events-none"
+                      style={{ width: `${t.progress}%`, background: `linear-gradient(90deg, ${color}22, ${color}33)` }} />
+                    {/* resize handles */}
+                    <span
+                      onPointerDown={(e) => startDrag(e as any, "left", t, (ns, ne) =>
+                        dispatch({ type: "UPDATE_TASK", payload: { id: t.id, patch: { startDate: ns, endDate: ne } } }))}
+                      className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/30" />
+                    <span
+                      onPointerDown={(e) => startDrag(e as any, "right", t, (ns, ne) =>
+                        dispatch({ type: "UPDATE_TASK", payload: { id: t.id, patch: { startDate: ns, endDate: ne } } }))}
+                      className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/30" />
+                    <div className="relative flex flex-col h-full px-2 py-1 gap-0.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="truncate text-[11px] font-semibold text-foreground">{t.title}</span>
+                        <span className="ml-auto rounded px-1 text-[9px] font-bold tabular-nums text-white" style={{ backgroundColor: color }}>{t.progress}%</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
+                        {owner && <MemberAvatar initials={owner.initials} color={owner.color} size="xs" />}
+                        {subs.length > 0 && (
+                          <span className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 font-semibold" style={{ backgroundColor: `${color}22`, color }} title={`${sd}/${subs.length} subtareas`}>
+                            <ListChecks className="h-2.5 w-2.5" />{sd}/{subs.length}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </button>
-              );
-            })}
+                );
+                yCursor += PARENT_H;
+
+                // Subtask bars
+                subs.forEach((s: Subtask) => {
+                  const ssDate = s.startDate ?? t.startDate;
+                  const seDate = s.endDate ?? s.dueDate ?? t.endDate;
+                  const ss = startOfDay(new Date(ssDate));
+                  const se = startOfDay(new Date(seDate));
+                  const dS = Math.max(0, differenceInCalendarDays(ss, start));
+                  const dE = Math.min(days.length - 1, differenceInCalendarDays(se, start));
+                  const subTop = yCursor;
+                  if (!(dE < 0 || dS > days.length - 1)) {
+                    const sStatus: TaskStatus = s.status ?? (s.done ? "completada" : "pendiente");
+                    const sColor = STATUS_COLOR[sStatus];
+                    const sSpan = dE - dS + 1;
+                    const subAssignee = s.assigneeId ? state.members.find(m => m.id === s.assigneeId) : null;
+                    nodes.push(
+                      <div
+                        key={`${t.id}-${s.id}`}
+                        onPointerDown={(e) => startDrag(e, "move", { startDate: ssDate, endDate: seDate }, (ns, ne) =>
+                          dispatch({ type: "UPDATE_SUBTASK", payload: { taskId: t.id, subtaskId: s.id, patch: { startDate: ns, endDate: ne } } }))}
+                        onClick={() => onEditSubtask(t.id, s.id)}
+                        className="group absolute rounded-md text-left overflow-hidden border bg-card shadow-xs hover:ring-2 hover:ring-primary/40 cursor-grab select-none"
+                        style={{ left: `calc(${dS * dayPct}% + 16px)`, width: `calc(${sSpan * dayPct}% - 20px)`, top: subTop + 3, height: SUB_H - 6, borderLeft: `3px solid ${sColor}` }}
+                        title={`${s.title} · ${sStatus}`}
+                      >
+                        <span aria-hidden className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(90deg, ${sColor}1a, ${sColor}26)` }} />
+                        <span
+                          onPointerDown={(e) => startDrag(e as any, "left", { startDate: ssDate, endDate: seDate }, (ns, ne) =>
+                            dispatch({ type: "UPDATE_SUBTASK", payload: { taskId: t.id, subtaskId: s.id, patch: { startDate: ns, endDate: ne } } }))}
+                          className="absolute left-0 top-0 h-full w-1 cursor-ew-resize hover:bg-primary/40" />
+                        <span
+                          onPointerDown={(e) => startDrag(e as any, "right", { startDate: ssDate, endDate: seDate }, (ns, ne) =>
+                            dispatch({ type: "UPDATE_SUBTASK", payload: { taskId: t.id, subtaskId: s.id, patch: { startDate: ns, endDate: ne } } }))}
+                          className="absolute right-0 top-0 h-full w-1 cursor-ew-resize hover:bg-primary/40" />
+                        <div className="relative flex items-center gap-1.5 h-full px-1.5">
+                          <span className="text-[9px] font-bold uppercase tracking-wider rounded px-1 py-0.5 text-white" style={{ backgroundColor: sColor }}>↳</span>
+                          <span className={`truncate text-[10px] font-medium ${s.done ? "line-through text-muted-foreground" : ""}`}>{s.title}</span>
+                          {subAssignee && <span className="ml-auto inline-flex items-center justify-center h-4 w-4 rounded-full text-[8px] font-bold text-white" style={{ backgroundColor: subAssignee.color }}>{subAssignee.initials}</span>}
+                        </div>
+                      </div>
+                    );
+                  }
+                  yCursor += SUB_H;
+                });
+              });
+              return nodes;
+            })()}
           </div>
         </div>
       </div>

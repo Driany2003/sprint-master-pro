@@ -43,6 +43,11 @@ export interface Subtask {
   projectId?: string | null;
   /** Fecha objetivo. */
   dueDate?: string | null;
+  /** Estado independiente (mismo enum que Task). */
+  status?: TaskStatus;
+  /** Rango temporal en el Timeline. */
+  startDate?: string | null;
+  endDate?: string | null;
   /** Checklist interno de pasos concretos. */
   checklist?: SubChecklistItem[];
 }
