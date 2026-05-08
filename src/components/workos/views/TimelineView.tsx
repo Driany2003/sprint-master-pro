@@ -10,9 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Activity, AlertOctagon, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Pencil, Plus, Trash2, Users, X, Zap, Flame, Route } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { useWorkOS as _ } from "@/store/workos-store";
-import { uid } from "@/store/workos-store";
 import type { Task, TaskPriority } from "@/lib/types";
 import { Bell } from "lucide-react";
 import { ConfirmDialog } from "../ConfirmDialog";
