@@ -147,7 +147,14 @@ export function TimelineView({ onCreateTask, onEditTask }: { onCreateTask: () =>
               })}
 
               {teams.map(team => (
-                <TeamRows key={team.area.id} team={team} days={days} start={start} onSelect={setSelectedId} />
+                <TeamRows
+                  key={team.area.id}
+                  team={team}
+                  days={days}
+                  start={start}
+                  onSelect={setSelectedId}
+                  onEditSubtask={(taskId, sid) => { setSelectedId(taskId); setSubDlg({ open: true, subtaskId: sid }); }}
+                />
               ))}
             </div>
           </div>
